@@ -143,26 +143,22 @@ function updateStationFuel() {
         var daysHours = data[i][1].split(' ');
         var daysremain = parseInt(daysHours[0]);
         var hoursremain = parseInt(daysHours[2]);
-        
+
         // Calculate the future date that is 'daysremain' days and 'hoursremain' hours away from now
         var futureDate = new Date();
         futureDate.setDate(futureDate.getDate() + daysremain);
         futureDate.setHours(futureDate.getHours() + hoursremain);
-        
         // Convert the future date to a Unix timestamp
-        var futureTimestamp = Math.floor(futureDate.getTime() / 1000);
-        
+        var futureTimestamp = Math.floor(futureDate.getTime() / 1000);        
         // Get the state from the current row
         var state = data[i][3];;
-        
-    
+          
         // Skip rows with empty station name
         if (stationName) {
           // Prepare the line to be added to the message
           //var line = "**" + stationName + "**" + " - fuel expires" + " <t:" + futureTimestamp + ":R> - " + "<t:" + futureTimestamp + ":f> ";
           
           var line = "**" + stationName + "**" + "\t".repeat(Math.ceil((40-stationName.length)/8)) + "\texpires" + " <t:" + futureTimestamp + ":R> - " + "<t:" + futureTimestamp + ":f> ";
-
 
           // If days remaining is less than 7, make the line bold and underlined
           if (daysremain < 7) {
@@ -175,8 +171,6 @@ function updateStationFuel() {
             //message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
 
             message = ""
-
-
 
           }
 

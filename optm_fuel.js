@@ -114,6 +114,17 @@ function updateStationFuel() {
     }
   }
   
+  // I want to sort a multi-dim array so I have to write a custom sort function
+  // sort() will send the two elements that it is comparing to this function
+  // The station name is in element [0] not [0][0] as in teh original array
+  function sortFunction(a, b) {
+      if (a[0] === b[0]) {
+          return 0;
+      }
+      else {
+          return (a[0] < b[0]) ? -1 : 1;
+      }
+  }
   
   // This function reports the status to Discord
   function reportStatusToDiscord() {
@@ -134,7 +145,7 @@ function updateStationFuel() {
 
     //Slice the array from index 3:end and then sort it A-Z
     //This skips the 1st 4 lines.  Are we skipping 1 too many?
-    var dataStnsOnly = data.slice(3).sort()
+    var dataStnsOnly = data.slice(3).sort(sortFunction)
 
     // Prepare the message to be sent to Discord
     //var message = "OPTM Fuel Status Update (" + timeupdate + "):\n";

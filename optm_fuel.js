@@ -1,6 +1,7 @@
 /*
  * This script is designed to automate the process of tracking fuel status for EVE Online structures.
- * It pulls data from the game using GESI as a dependency in Google sheets to access EVE Online's API, processes the data, and reports the status to a Discord server via a web hook.
+ * It pulls data from the game using GESI as a dependency in Google sheets to access EVE Online's API, 
+ * processes the data, and reports the status to a Discord server via a web hook.
  * 
  * The script consists of several functions:
  * - setupSheetsForNewUser: Sets up the necessary sheets for a new user and provides instructions for setting up time-based triggers.
@@ -113,6 +114,17 @@ function updateStationFuel() {
     }
   }
   
+  // I want to sort a multi-dim array so I have to write a custom sort function
+  // sort() will send the two elements that it is comparing to this function
+  // The station name is in element [0] not [0][0] as in teh original array
+  function sortFunction(a, b) {
+      if (a[0] === b[0]) {
+          return 0;
+      }
+      else {
+          return (a[0] < b[0]) ? -1 : 1;
+      }
+  }
   
   // This function reports the status to Discord
   function reportStatusToDiscord() {
@@ -121,21 +133,29 @@ function updateStationFuel() {
     // Get the spreadsheet by its ID
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       
-      // Get the Discord webhook URL from cell G2 of the "CleanData" sheet
-      var discordWebhookUrl = spreadsheet.getSheetByName("ESI_List").getRange("G2").getValue();   
+    // Get the Discord webhook URL from cell G2 of the "CleanData" sheet
+    var discordWebhookUrl = spreadsheet.getSheetByName("ESI_List").getRange("G2").getValue();   
+
+    // Get the sheet named "CleanData" from the active spreadsheet
+    var sheet = spreadsheet.getSheetByName("CleanData");
   
-      // Get the sheet named "CleanData" from the active spreadsheet
-      var sheet = spreadsheet.getSheetByName("CleanData");
-    
-      // Get all the data from the "CleanData" sheet
-      var data = sheet.getDataRange().getValues();
-      var timeupdate = data[0][4]
-    
-      // Prepare the message to be sent to Discord
-      var message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
-    
-      // Start from the third row to skip the header
-      for (var i = 3; i < data.length; i++) {
+    // Get all the data from the "CleanData" sheet
+    var data = sheet.getDataRange().getValues();
+    var timeupdate = data[0][4]
+
+    //Slice the array from index 3:end and then sort it A-Z
+    //This skips the 1st 4 lines.  Are we skipping 1 too many?
+    var dataStnsOnly = data.slice(3).sort(sortFunction)
+
+    // Prepare the message to be sent to Discord
+    //var message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
+    var message = "```ini\nOPTM Fuel Status Update (" + timeupdate + "):\n\n";
+  
+    // Start from the third row to skip the header
+    // for (var i = 3; i < data.length; i++) {
+
+      //We alreay cut the 1st 4 lines so just run through the sorted array like usuall
+      for (var i = 0; i < dataStnsOnly.length; i++) {
         // Get the station name from the current row
         var stationName = data[i][0];
         
@@ -167,7 +187,8 @@ function updateStationFuel() {
 
           //Check for msg length over 2000; if yes, send it and start new msg
           if((message.length + line.length) > 2000) {
-            sendToDiscord(message, discordWebhookUrl);
+            //sendToDiscord(message, discordWebhookUrl);
+            sendToDiscord(message +"```", discordWebhookUrl);
             //message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
 
             message = ""
@@ -175,12 +196,13 @@ function updateStationFuel() {
           }
 
           // Add the line to the message
-          message += line + "\n";
+          // message += line + "\n";
+          message += line + "\n```";
         }
       }
     
    // Get the Discord webhook URL from cell G2 of the "CleanData" sheet
-   var discordWebhookUrl = spreadsheet.getSheetByName("ESI_List").getRange("G2").getValue();
+  //  var discordWebhookUrl = spreadsheet.getSheetByName("ESI_List").getRange("G2").getValue();
     
       // Send the message to Discord
       sendToDiscord(message, discordWebhookUrl);

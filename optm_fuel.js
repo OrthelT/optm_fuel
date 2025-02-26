@@ -141,89 +141,130 @@ function updateStationFuel() {
   
     // Get all the data from the "CleanData" sheet
     var data = sheet.getDataRange().getValues();
-    var timeupdate = data[0][4]
+    var timeupdate = data[0][4];
 
     //Slice the array from index 3:end and then sort it A-Z
-    //This skips the 1st 4 lines.  Are we skipping 1 too many?
-    var dataStnsOnly = data.slice(3).sort(sortFunction)
+    var dataStnsOnly = data.slice(3).sort(sortFunction);
 
-    // Prepare the message to be sent to Discord
-    //var message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
-    var message = "OPTM Fuel Status Update (" + timeupdate + "):\n\n";
-  
-    // Start from the third row to skip the header
-    // for (var i = 3; i < data.length; i++) {
+    // Create arrays for different urgency levels
+    var criticalStructures = [];
+    var warningStructures = [];
+    var healthyStructures = [];
 
-      //We alreay cut the 1st 4 lines so just run through the sorted array like usuall
-      for (var i = 0; i < dataStnsOnly.length; i++) {
-        // Get the station name from the current row
-        var stationName = dataStnsOnly[i][0];
-        
-        // Get the days and hours remaining from the current row and parse them as integers
-        var daysHours = dataStnsOnly[i][1].split(' ');
-        var daysremain = parseInt(daysHours[0]);
-        var hoursremain = parseInt(daysHours[2]);
+    // Sort structures by fuel status
+    for (var i = 0; i < dataStnsOnly.length; i++) {
+      // Get the station name from the current row
+      var stationName = dataStnsOnly[i][0];
+      
+      if (!stationName) continue;
+      
+      // Get the days and hours remaining from the current row and parse them as integers
+      var daysHours = dataStnsOnly[i][1].split(' ');
+      var daysremain = parseInt(daysHours[0]);
+      var hoursremain = parseInt(daysHours[2]);
 
-        // Calculate the future date that is 'daysremain' days and 'hoursremain' hours away from now
-        var futureDate = new Date();
-        futureDate.setDate(futureDate.getDate() + daysremain);
-        futureDate.setHours(futureDate.getHours() + hoursremain);
-        // Convert the future date to a Unix timestamp
-        var futureTimestamp = Math.floor(futureDate.getTime() / 1000);        
-        // Get the state from the current row
-        var state = dataStnsOnly[i][3];;
-          
-        // Skip rows with empty station name
-        if (stationName) {
-          // Prepare the line to be added to the message
-          //var line = "**" + stationName + "**" + " - fuel expires" + " <t:" + futureTimestamp + ":R> - " + "<t:" + futureTimestamp + ":f> ";
-          
-          var line = "**" + stationName + "**" + "\t".repeat(Math.ceil((40-stationName.length)/8)) + "\texpires" + " <t:" + futureTimestamp + ":R> - " + "<t:" + futureTimestamp + ":f> ";
-
-          // If days remaining is less than 7, make the line bold and underlined
-          if (daysremain < 7) {
-            line = "__" + line + "__";
-          }
-
-          //Check for msg length over 2000; if yes, send it and start new msg
-          if((message.length + line.length) > 1950) {
-            //sendToDiscord(message, discordWebhookUrl);
-            sendToDiscord(message, discordWebhookUrl);
-            //message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
-
-            message = ""
-
-          }
-
-          // Add the line to the message
-          // message += line + "\n";
-          message += line + "\n";
-        }
+      // Calculate the future date that is 'daysremain' days and 'hoursremain' hours away from now
+      var futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + daysremain);
+      futureDate.setHours(futureDate.getHours() + hoursremain);
+      // Convert the future date to a Unix timestamp
+      var futureTimestamp = Math.floor(futureDate.getTime() / 1000);        
+      
+      // Add structure to appropriate array based on remaining fuel
+      var structureInfo = {
+        name: stationName,
+        days: daysremain,
+        hours: hoursremain,
+        timestamp: futureTimestamp,
+        state: dataStnsOnly[i][3]
+      };
+      
+      if (daysremain < 3) {
+        criticalStructures.push(structureInfo);
+      } else if (daysremain < 7) {
+        warningStructures.push(structureInfo);
+      } else {
+        healthyStructures.push(structureInfo);
       }
+    }
     
-   // Get the Discord webhook URL from cell G2 of the "CleanData" sheet
-  //  var discordWebhookUrl = spreadsheet.getSheetByName("ESI_List").getRange("G2").getValue();
+    // Create embeds for each category
+    var embeds = [];
     
-      // Send the message to Discord
-      sendToDiscord(message, discordWebhookUrl);
+    // Add a main embed with summary information
+    embeds.push({
+      title: "OPTM Fuel Status Update",
+      description: `Update time: ${timeupdate}`,
+      color: 3447003, // Blue color
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: "EVE Online Structure Tracker"
+      }
+    });
+    
+    // Add critical structures embed if any exist
+    if (criticalStructures.length > 0) {
+      var criticalEmbed = {
+        title: "🔴 CRITICAL - Immediate Action Required",
+        description: "",
+        color: 15158332 // Red color
+      };
+      
+      criticalStructures.forEach(function(structure) {
+        criticalEmbed.description += `**${structure.name}** - ${structure.days} days ${structure.hours} hours remaining\n` +
+                                    `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
+      });
+      
+      embeds.push(criticalEmbed);
+    }
+    
+    // Add warning structures embed if any exist
+    if (warningStructures.length > 0) {
+      var warningEmbed = {
+        title: "🟠 WARNING - Action Needed Soon",
+        description: "",
+        color: 16763904 // Orange color
+      };
+      
+      warningStructures.forEach(function(structure) {
+        warningEmbed.description += `**${structure.name}** - ${structure.days} days ${structure.hours} hours remaining\n` +
+                                   `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
+      });
+      
+      embeds.push(warningEmbed);
+    }
+    
+    // Add healthy structures embed
+    if (healthyStructures.length > 0) {
+      var healthyEmbed = {
+        title: "🟢 HEALTHY - No Immediate Action Required",
+        description: "",
+        color: 3066993 // Green color
+      };
+      
+      healthyStructures.forEach(function(structure) {
+        healthyEmbed.description += `**${structure.name}** - ${structure.days} days ${structure.hours} hours remaining\n` +
+                                   `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
+      });
+      
+      embeds.push(healthyEmbed);
+    }
+    
+    // Send embeds to Discord
+    sendToDiscord(embeds, discordWebhookUrl);
   }
   
   // This function sends a message to Discord using a webhook
-  function sendToDiscord(message, webhookUrl) {
-      // Prepare the payload to be sent to Discord
-      var payload = {
-        // The HTTP method to be used for the request
-        method: "POST",
-        
-        // The content type of the request
-        contentType: "application/json",
-        
-        // The body of the request. It's a JSON string that contains the message to be sent to Discord
-        payload: JSON.stringify({ content: message }),
-      };
-    
-      // Send the HTTP request to the Discord webhook URL
-      UrlFetchApp.fetch(webhookUrl, payload);
+  function sendToDiscord(embeds, webhookUrl) {
+    // Prepare the payload to be sent to Discord
+    var payload = {
+      method: "POST",
+      contentType: "application/json",
+      payload: JSON.stringify({ embeds: embeds }),
+    };
+  
+    // Send the HTTP request to the Discord webhook URL
+    UrlFetchApp.fetch(webhookUrl, payload);
   }
   
   // This function sets up the sheets for a new user

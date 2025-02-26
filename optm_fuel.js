@@ -149,7 +149,7 @@ function updateStationFuel() {
 
     // Prepare the message to be sent to Discord
     //var message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
-    var message = "```ini\nOPTM Fuel Status Update (" + timeupdate + "):\n\n";
+    var message = "OPTM Fuel Status Update (" + timeupdate + "):\n\n";
   
     // Start from the third row to skip the header
     // for (var i = 3; i < data.length; i++) {
@@ -157,10 +157,10 @@ function updateStationFuel() {
       //We alreay cut the 1st 4 lines so just run through the sorted array like usuall
       for (var i = 0; i < dataStnsOnly.length; i++) {
         // Get the station name from the current row
-        var stationName = data[i][0];
+        var stationName = dataStnsOnly[i][0];
         
         // Get the days and hours remaining from the current row and parse them as integers
-        var daysHours = data[i][1].split(' ');
+        var daysHours = dataStnsOnly[i][1].split(' ');
         var daysremain = parseInt(daysHours[0]);
         var hoursremain = parseInt(daysHours[2]);
 
@@ -171,7 +171,7 @@ function updateStationFuel() {
         // Convert the future date to a Unix timestamp
         var futureTimestamp = Math.floor(futureDate.getTime() / 1000);        
         // Get the state from the current row
-        var state = data[i][3];;
+        var state = dataStnsOnly[i][3];;
           
         // Skip rows with empty station name
         if (stationName) {
@@ -186,9 +186,9 @@ function updateStationFuel() {
           }
 
           //Check for msg length over 2000; if yes, send it and start new msg
-          if((message.length + line.length) > 2000) {
+          if((message.length + line.length) > 1950) {
             //sendToDiscord(message, discordWebhookUrl);
-            sendToDiscord(message +"```", discordWebhookUrl);
+            sendToDiscord(message, discordWebhookUrl);
             //message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
 
             message = ""
@@ -197,7 +197,7 @@ function updateStationFuel() {
 
           // Add the line to the message
           // message += line + "\n";
-          message += line + "\n```";
+          message += line + "\n";
         }
       }
     

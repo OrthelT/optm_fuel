@@ -148,64 +148,55 @@ function updateStationFuel() {
     var dataStnsOnly = data.slice(3).sort(sortFunction)
 
     // Prepare the message to be sent to Discord
-    //var message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
-    var message = "```ini\nOPTM Fuel Status Update (" + timeupdate + "):\n\n";
+    var message = "**OPTM Fuel Status Update (" + timeupdate + "):**\n\n";
   
-    // Start from the third row to skip the header
-    // for (var i = 3; i < data.length; i++) {
+    // We already cut the 1st 4 lines so just run through the sorted array like usual
+    for (var i = 0; i < dataStnsOnly.length; i++) {
+      // Get the station name from the current row
+      var stationName = dataStnsOnly[i][0];
+      
+      // Get the days and hours remaining from the current row and parse them as integers
+      var daysHours = dataStnsOnly[i][1].split(' ');
+      var daysremain = parseInt(daysHours[0]);
+      var hoursremain = parseInt(daysHours[2]);
 
-      //We alreay cut the 1st 4 lines so just run through the sorted array like usuall
-      for (var i = 0; i < dataStnsOnly.length; i++) {
-        // Get the station name from the current row
-        var stationName = data[i][0];
+      // Calculate the future date that is 'daysremain' days and 'hoursremain' hours away from now
+      var futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + daysremain);
+      futureDate.setHours(futureDate.getHours() + hoursremain);
+      // Convert the future date to a Unix timestamp
+      var futureTimestamp = Math.floor(futureDate.getTime() / 1000);        
+      // Get the state from the current row
+      var state = dataStnsOnly[i][3];
         
-        // Get the days and hours remaining from the current row and parse them as integers
-        var daysHours = data[i][1].split(' ');
-        var daysremain = parseInt(daysHours[0]);
-        var hoursremain = parseInt(daysHours[2]);
+      // Skip rows with empty station name
+      if (stationName) {
+        // Prepare the line to be added to the message
+        var line = "**" + stationName + "**";
+        
+        // Add appropriate spacing for alignment
+        line += " - expires <t:" + futureTimestamp + ":R> - <t:" + futureTimestamp + ":f>";
 
-        // Calculate the future date that is 'daysremain' days and 'hoursremain' hours away from now
-        var futureDate = new Date();
-        futureDate.setDate(futureDate.getDate() + daysremain);
-        futureDate.setHours(futureDate.getHours() + hoursremain);
-        // Convert the future date to a Unix timestamp
-        var futureTimestamp = Math.floor(futureDate.getTime() / 1000);        
-        // Get the state from the current row
-        var state = data[i][3];;
-          
-        // Skip rows with empty station name
-        if (stationName) {
-          // Prepare the line to be added to the message
-          //var line = "**" + stationName + "**" + " - fuel expires" + " <t:" + futureTimestamp + ":R> - " + "<t:" + futureTimestamp + ":f> ";
-          
-          var line = "**" + stationName + "**" + "\t".repeat(Math.ceil((40-stationName.length)/8)) + "\texpires" + " <t:" + futureTimestamp + ":R> - " + "<t:" + futureTimestamp + ":f> ";
-
-          // If days remaining is less than 7, make the line bold and underlined
-          if (daysremain < 7) {
-            line = "__" + line + "__";
-          }
-
-          //Check for msg length over 2000; if yes, send it and start new msg
-          if((message.length + line.length) > 2000) {
-            //sendToDiscord(message, discordWebhookUrl);
-            sendToDiscord(message +"```", discordWebhookUrl);
-            //message = "OPTM Fuel Status Update (" + timeupdate + "):\n";
-
-            message = ""
-
-          }
-
-          // Add the line to the message
-          // message += line + "\n";
-          message += line + "\n```";
+        // If days remaining is less than 7, make the line bold and underlined
+        if (daysremain < 7) {
+          line = "__" + line + "__";
         }
+
+        // Check for msg length over 2000; if yes, send it and start new msg
+        if ((message.length + line.length) > 2000) {
+          sendToDiscord(message, discordWebhookUrl);
+          message = "";
+        }
+
+        // Add the line to the message with a newline
+        message += line + "\n";
       }
+    }
     
-   // Get the Discord webhook URL from cell G2 of the "CleanData" sheet
-  //  var discordWebhookUrl = spreadsheet.getSheetByName("ESI_List").getRange("G2").getValue();
-    
-      // Send the message to Discord
+    // Send the message to Discord if it's not empty
+    if (message.length > 0) {
       sendToDiscord(message, discordWebhookUrl);
+    }
   }
   
   // This function sends a message to Discord using a webhook

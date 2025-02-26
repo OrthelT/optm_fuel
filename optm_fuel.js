@@ -200,16 +200,12 @@ function updateStationFuel() {
       description: `Update time: ${timeupdate}`,
       color: 3447003, // Blue color
       timestamp: new Date().toISOString(),
-      thumbnail: {
-        url: logoUrl
-      },
       author: {
-        name: "OPTM Corporation",
+        name: "OPTM Fuel Bot",
         icon_url: logoUrl
       },
       footer: {
-        text: "EVE Online Structure Tracker",
-        icon_url: logoUrl
+        text: "EVE Online Structure Tracker"
       }
     });
     

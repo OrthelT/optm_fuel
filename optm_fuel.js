@@ -143,6 +143,9 @@ function updateStationFuel() {
     var data = sheet.getDataRange().getValues();
     var timeupdate = data[0][4];
 
+    // OPTM Corporation logo URL
+    var logoUrl = "https://images.evetech.net/corporations/98707560/logo?size=64";
+
     //Slice the array from index 3:end and then sort it A-Z
     var dataStnsOnly = data.slice(3).sort(sortFunction);
 
@@ -191,14 +194,22 @@ function updateStationFuel() {
     // Create embeds for each category
     var embeds = [];
     
-    // Add a main embed with summary information
+    // Add a main embed with summary information and OPTM logo
     embeds.push({
-      title: "OPTM Fuel Status Update",
+      title: "Fuel Status Update",
       description: `Update time: ${timeupdate}`,
       color: 3447003, // Blue color
       timestamp: new Date().toISOString(),
+      thumbnail: {
+        url: logoUrl
+      },
+      author: {
+        name: "OPTM Corporation",
+        icon_url: logoUrl
+      },
       footer: {
-        text: "EVE Online Structure Tracker"
+        text: "EVE Online Structure Tracker",
+        icon_url: logoUrl
       }
     });
     

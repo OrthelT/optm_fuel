@@ -218,8 +218,8 @@ function updateStationFuel() {
       };
       
       criticalStructures.forEach(function(structure) {
-        criticalEmbed.description += `**${structure.name}** - ${structure.days} days ${structure.hours} hours remaining\n` +
-                                    `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
+        criticalEmbed.description += `**${structure.name}** -- ${structure.days} days ${structure.hours} hours remaining\n` //+
+                                    // `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
       });
       
       embeds.push(criticalEmbed);
@@ -234,14 +234,15 @@ function updateStationFuel() {
       };
       
       warningStructures.forEach(function(structure) {
-        warningEmbed.description += `**${structure.name}** - ${structure.days} days ${structure.hours} hours remaining\n` +
-                                   `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
+        warningEmbed.description += `**${structure.name}** -- ${structure.days} days ${structure.hours} hours remaining\n` //+
+                                  //  `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
       });
       
       embeds.push(warningEmbed);
     }
     
     // Add healthy structures embed
+    //If its helthy just note the days
     if (healthyStructures.length > 0) {
       var healthyEmbed = {
         title: "🟢 HEALTHY - No Immediate Action Required",
@@ -250,8 +251,8 @@ function updateStationFuel() {
       };
       
       healthyStructures.forEach(function(structure) {
-        healthyEmbed.description += `**${structure.name}** - ${structure.days} days ${structure.hours} hours remaining\n` +
-                                   `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
+        healthyEmbed.description += `**${structure.name}** -- ${structure.days} days\n` // ${structure.hours} hours remaining\n` +
+                                  //  `Expires: <t:${structure.timestamp}:R> (<t:${structure.timestamp}:f>)\n\n`;
       });
       
       embeds.push(healthyEmbed);

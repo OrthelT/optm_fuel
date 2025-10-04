@@ -1,61 +1,148 @@
 # EVE Online Structure Fuel Tracker
 
-A Google Apps Script project that automates fuel status tracking for EVE Online structures. This script integrates with Google Sheets, EVE Online's ESI API (via GESI), and Discord to provide timely updates about structure fuel levels.
+Automatically track your structure fuel levels and get daily Discord notifications. No coding required!
 
-## Features
+## What You'll Get
 
-- Automatically pulls structure fuel data from EVE Online using GESI
-- Processes and cleans the data in Google Sheets
-- Sends formatted fuel status updates to Discord
-- Supports multiple structures and corporations
-- Provides time-based automated updates
-- Custom Google Sheets menu for manual operations
+- Daily Discord updates showing which structures need fuel
+- Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
+- Automatic updates - set it once and forget it
+- Supports all your corporation's structures
 
-## Prerequisites
+## What You Need
 
-1. Google Sheets account
-2. [GESI](https://blacksmoke16.github.io/GESI/) setup for EVE Online API access
-3. Discord webhook URL for notifications
-4. EVE Online character(s) with appropriate structure viewing permissions
+1. A Google account
+2. An EVE Online character with permission to view your structures
+3. A Discord server where you can create a webhook
 
-## Setup Instructions
+## If You Need Help
+- Paste the Claude.md file into your LLM. It has everything an LLM needs to know to help you get set up. 
+- Join my Discord and post your questions or suggestions for improvements: [Orthel's Lab](https://discord.gg/5FdUr9KRde)
 
-1. Create a new Google Sheet
-2. Set up GESI following instructions at https://blacksmoke16.github.io/GESI/
-3. Copy the script code to Google Apps Script editor
-4. Run the setup function from the "Setup" menu
-5. Follow the instructions provided in the "Instructions" sheet:
-   - Enter EVE character names in the ESI_List sheet
-   - Configure Discord webhook URL
-   - Set up time-based triggers for automated updates
+## Setup (5-10 minutes)
 
-## Sheets Structure
+### Step 1: Create Your Google Sheet
 
-The script creates and manages several sheets:
-- **Pull**: Raw data from EVE Online API
-- **ESI_List**: Configuration for character names and Discord webhook
-- **CleanData**: Processed fuel status data
-- **Instructions**: Setup and configuration instructions
+1. Go to [Google Sheets](https://sheets.google.com) and create a new blank spreadsheet
+2. Name it something like "EVE Fuel Tracker"
 
-## Time-Based Triggers
+### Step 2: Install GESI Library (Required)
 
-The script uses three main time-based triggers:
-1. `getUtcTimestampToS2`: Runs every 6 hours
-2. `updateStationFuel`: Runs daily at a specified time
-3. `reportStatusToDiscord`: Runs daily, one hour after updateStationFuel
+GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documentation](https://github.com/Blacksmoke16/GESI)
 
-## Discord Notifications
+1. In your Google Sheet, click **Extensions** → **Apps Script**
+2. In the Apps Script editor, click the **+** next to "Libraries" on the left
+3. Paste this Script ID: `1KjnRVVFr2KiHH55sqBfHcZ-yXweJ7iv89V99ubaLy4A7B_YH8rB5u0s3`
+4. Click **Look up**, select the latest version, then click **Add**
+5. Ensure the identifier is set to `GESI`
+6. Close the Apps Script tab and return to your Google Sheet
 
-The script sends formatted messages to Discord including:
-- Structure names
-- Time remaining until fuel expiration
-- Relative and absolute timestamps
-- Visual emphasis for structures with less than 7 days of fuel
+### Step 3: Add the Fuel Tracker Script
+
+1. In your Google Sheet, click **Extensions** → **Apps Script** again
+2. Delete any existing code in the editor
+3. Copy all the code from [fuel-tracker.gs](fuel-tracker.gs) and paste it into the editor
+4. Click the **Save** icon (💾)
+5. Close the Apps Script tab and return to your Google Sheet
+
+### Step 4: Run Initial Setup
+
+1. Refresh your Google Sheet page (press F5)
+2. You'll see a new menu called **Setup** at the top
+3. Click **Setup** → **Setup**
+4. Google will ask for permissions - click **Continue** → **Advanced** → **Go to [your project name]** → **Allow**
+5. The script will create several sheets in your workbook
+
+### Step 5: Authenticate Your EVE Character
+
+**If you don't have the GESI plugin installed**, see "Installing GESI Plugin" at the end of this guide.
+
+1. Go to the **Settings** sheet
+2. In **Cell A2**, enter your EVE character name (must be exact, case-sensitive)
+3. Click **Extensions** → **GESI** → **Authorize Character**
+4. A new tab will open for EVE SSO login
+5. Log in with the EVE Online account for the character you entered in Cell A2
+6. Review the requested scopes and click **Authorize**
+7. Close the EVE SSO tab and return to Google Sheets
+8. Click **Fuel stuff** → **Update Station Fuel** to verify authentication worked. The Pull sheet and CleanData sheets should be populated with your structures. 
+
+**Required Character Roles:** Your character must have the **Station Manager** or **Director** corporation role.
+
+### Step 6: Configure Discord Webhook
+
+1. In the **Settings** sheet, enter your Discord webhook URL in **Cell G2**
+
+**To create a Discord webhook:**
+1. In Discord, go to Server Settings → Integrations → Webhooks
+2. Click **New Webhook**
+3. Choose the channel for notifications
+4. Click **Copy Webhook URL**
+5. Paste it into cell G2 of **Settings** sheet
+
+### Step 7: Set Up Automation
+
+1. Click **Extensions** → **Apps Script**
+2. Click the clock icon ⏰ on the left (Triggers)
+3. Click **+ Add Trigger** (bottom right) and configure:
+   - Function: **updateStationFuel**
+   - Event source: **Time-driven**
+   - Type: **Day timer**
+   - Time: Choose when you want updates (e.g., 8am-9am)
+   - Click **Save**
+
+4. Click **+ Add Trigger** again:
+   - Function: **reportStatusToDiscord**
+   - Event source: **Time-driven**
+   - Type: **Day timer**
+   - Time: Choose 1 hour after the previous trigger
+   - Click **Save**
+
+5. Click **+ Add Trigger** one more time:
+   - Function: **getUtcTimestampToS2**
+   - Event source: **Time-driven**
+   - Type: **Hours timer**
+   - Hours interval: **Every 6 hours**
+   - Click **Save**
+
+### Step 8: Test It
+
+1. Return to your Google Sheet
+2. Click **Fuel stuff** menu → **Report Status to Discord**
+3. Check your Discord channel for the fuel report!
+
+## Troubleshooting
+
+**"GESI is not defined" error**: Go back to Step 2 and make sure you added the GESI library correctly.
+
+**No structures showing**: Verify you have authenticated your character (Step 5), your character name is spelled exactly right and that your character has the **Station Manager** or **Director** role.
+
+**No Discord message**: Double-check your webhook URL in cell G2 of the Settings sheet.
+
+**Authorization errors**: Make sure you've completed Step 5 to authenticate your EVE character.
+
+**Editing fuel-tracker.gs locally**: The `.gs` file extension may not be recognized by your code editor. Configure your editor to treat `.gs` files as JavaScript for proper syntax highlighting. For example, in VSCode, add `"*.gs": "javascript"` to your file associations setting.
+
+## Optional Customization
+
+In the **Settings** sheet, you can:
+- **Cell G5**: Change the bot name (default: "[Your Corp] Fuel Bot")
+- **Cell G8**: Use a custom logo URL (default: your corp logo)
+
+## Installing GESI Plugin
+
+If you don't already have the GESI plugin installed in Google Sheets:
+
+1. In your Google Sheet, click **Extensions** → **Add-ons** → **Get add-ons**
+2. Search for **GESI** in the Google Workspace Marketplace
+3. Click on GESI and then click **Install**
+4. Select your Google account and grant permissions
+5. After installation, click **Extensions** → **GESI** → **Authorize Character**
+6. Follow the authorization prompts to link your EVE Online account
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests!
+Feel free to submit issues and enhancement requests! PRs are welcome if you have ideas for improvements. 
 
 ## License
 
-MIT License - See LICENSE file for details 
+MIT License - See LICENSE file for details

@@ -61,7 +61,7 @@ Three scheduled functions maintain automation:
 - Test functions using the custom "Fuel stuff" menu in Google Sheets or the Apps Script editor
 
 **GESI Integration:**
-- GESI must be added as a library in Apps Script (Script ID: 1T9dLrcriMPPYiFNiOSrAeGBj3M6Rf2RLvXaNPe_MNk5QjWF1kEPmN88M)
+- GESI must be added as a library in Apps Script (Script ID: 1KjnRVVFr2KiHH55sqBfHcZ-yXweJ7iv89V99ubaLy4A7B_YH8rB5u0s3)
 - Primary GESI calls:
   - `GESI.corporations_corporation_structures()` - Fetch structure data
   - `GESI.getCharacterData()` - Fetch character info

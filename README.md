@@ -24,12 +24,13 @@ Automatically track your structure fuel levels and get daily Discord notificatio
 
 ### Step 2: Install GESI (EVE API Connection)
 
-GESI is a library that connects Google Sheets to EVE Online's API. [Learn more about GESI](https://github.com/Blacksmoke16/GESI)
+GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documentation](https://github.com/Blacksmoke16/GESI)
 
 1. In your Google Sheet, click **Extensions** → **Apps Script**
 2. In the Apps Script editor, click the **+** next to "Libraries" on the left
-3. Paste this Script ID: `1T9dLrcriMPPYiFNiOSrAeGBj3M6Rf2RLvXaNPe_MNk5QjWF1kEPmN88M`
-4. Click **Look up**, then click **Add**
+3. Paste this Script ID: 
+```1KjnRVVFr2KiHH55sqBfHcZ-yXweJ7iv89V99ubaLy4A7B_YH8rB5u0s3```
+4. Click **Look up**, select the most recent version that is NOT "HEAD", then click **Add**
 5. Close the Apps Script tab and return to your Google Sheet
 
 ### Step 3: Add the Fuel Tracker Script
@@ -61,7 +62,7 @@ GESI is a library that connects Google Sheets to EVE Online's API. [Learn more a
 2. Click **New Webhook**
 3. Choose the channel for notifications
 4. Click **Copy Webhook URL**
-5. Paste it into cell G2
+5. Paste it into cell G2 of **ESI_List**
 
 ### Step 6: Set Up Automation
 

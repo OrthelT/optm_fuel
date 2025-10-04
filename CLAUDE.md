@@ -34,13 +34,13 @@ The single-file application follows a functional architecture with time-triggere
 
 **Sheet Structure:**
 - **Pull**: Raw API data from EVE Online (cleared and refreshed on each update)
-- **ESI_List**: Configuration (character names in A2+, Discord webhook in G2, optional bot customization in G5/G8)
+- **ESI_List**: Configuration (character name in A2, Discord webhook in G2, optional bot customization in G5/G8)
 - **CleanData**: Computed fuel status with formulas (rows 4-104 for up to 100 structures)
 - **Instructions**: Setup guidance for end users
 
 ### Key Functions
 
-- `updateStationFuel()`: Iterates through characters in ESI_List, calls GESI API, populates Pull sheet with 5-second delays between requests
+- `updateStationFuel()`: Fetches structure data for the character in ESI_List A2, calls GESI API, populates Pull sheet
 - `reportStatusToDiscord()`: Categorizes structures into critical (<3 days), warning (3-7 days), healthy (>7 days), creates color-coded Discord embeds
 - `GetCharInfo()`: Retrieves character data for the main character (ESI_List A2)
 - `getCorpName()` / `getCorpLogoUrl()`: Fetches corporation info for Discord bot identity
@@ -77,10 +77,6 @@ Three scheduled functions maintain automation:
 
 **Required Character Roles:**
 - The character must have the **Station Manager** or **Director** corporation role to access structure data
-
-**Multiple Characters:**
-- Add additional character names in ESI_List (A3, A4, etc.)
-- Each character will trigger its own authorization flow on first use
 
 ## Development Notes
 

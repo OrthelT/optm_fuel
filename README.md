@@ -7,7 +7,7 @@ Automatically track your structure fuel levels and get daily Discord notificatio
 - Daily Discord updates showing which structures need fuel
 - Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
 - Automatic updates - set it once and forget it
-- Supports multiple characters and structures
+- Supports all your corporation's structures
 
 ## What You Need
 
@@ -122,7 +122,6 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 In the **ESI_List** sheet, you can:
 - **Cell G5**: Change the bot name (default: "[Your Corp] Fuel Bot")
 - **Cell G8**: Use a custom logo URL (default: your corp logo)
-- **Multiple Characters**: Add additional character names in cells A3, A4, etc. (each will require separate authentication)
 
 ## Installing GESI Plugin
 

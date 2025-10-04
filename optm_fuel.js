@@ -37,7 +37,38 @@ function onOpen() {
       // Add the setup menu to the user interface
       .addToUi();
   }
-  
+
+  function getCorpName() {
+    //Gets the name of the corp associated with the main character listed at ESI_List cell A2.
+    var charinfo = GetCharInfo();
+    var corpID = charinfo.corporation_id
+    var corpName = GESI.corporations_corporation(corpID)[1][8]
+    return corpName
+  }
+
+  function getCorpLogoUrl() {
+    // Returns the Eve image server URL of the corp logo for the main character listed at ESI_List cell A2 
+    var charinfo = GetCharInfo();
+    var logoUrl = "https://images.evetech.net/corporations/"+charinfo.corporation_id+"/logo?size=64";
+
+    return logoUrl
+  }
+
+  function GetCharInfo() {
+    //Gets info about the main character listed at ESI_List cell A2 and returns a dictionary of information.
+    
+    // Get the stored ID of the spreadsheet
+    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
+    // Get the spreadsheet by its ID
+    var ss = SpreadsheetApp.openById(spreadsheetId);
+    var eList = ss.getSheetByName("ESI_List");
+    var mainchar = eList.getRange("A2").getValue();
+    var charinfo = GESI.getCharacterData(mainchar);
+    Logger.log("data: %s",charinfo)
+
+    return charinfo
+  }
+    
   // This function clears cell D1 on the "CleanData" sheet
   function clearCellS2() {
     // Get the active spreadsheet
@@ -74,6 +105,11 @@ function onOpen() {
   
 // This function updates the station's fuel.
 function updateStationFuel() {
+
+    //clear and reset the timestamp
+    clearCellS2()
+    getUtcTimestampToS2()
+
     // Get the stored ID of the spreadsheet
     var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
     // Get the spreadsheet by its ID
@@ -128,6 +164,9 @@ function updateStationFuel() {
   
   // This function reports the status to Discord
   function reportStatusToDiscord() {
+    //clear and reset the timestamp
+    getUtcTimestampToS2()
+    
     // Get the stored ID of the spreadsheet
     var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
     // Get the spreadsheet by its ID
@@ -143,8 +182,26 @@ function updateStationFuel() {
     var data = sheet.getDataRange().getValues();
     var timeupdate = data[0][4];
 
-    // OPTM Corporation logo URL
-    var logoUrl = "https://images.evetech.net/corporations/98707560/logo?size=64";
+    // set name and logo for the Discord Bot. Either corp name/logo (default) or custon name/logo (optional)
+    var esisheet = spreadsheet.getSheetByName("ESI_List");
+    var customName = esisheet.getRange('G5').getValue();
+    var customURL = esisheet.getRange('G8').getValue();
+
+    // Use customn name if configured or <CorpName> Fuel Bot if not
+    if (customName) {
+      var botName = customName;
+    } else {
+      corpID = GetCharInfo().corporation_id;
+      corpName = getCorpName();
+      var botName = corpName + " Fuel Bot";
+    }
+    
+    // Use corp logo or custom logo if configured
+    if (customURL) {
+      var logoUrl = customURL;
+    } else {
+      logoUrl = getCorpLogoUrl()
+    }
 
     //Slice the array from index 3:end and then sort it A-Z
     var dataStnsOnly = data.slice(3).sort(sortFunction);
@@ -197,11 +254,11 @@ function updateStationFuel() {
     // Add a main embed with summary information and OPTM logo
     embeds.push({
       title: "Fuel Status Update",
-      description: `Update time: ${timeupdate}`,
+      description: "",
       color: 3447003, // Blue color
       timestamp: new Date().toISOString(),
       author: {
-        name: "OPTM Fuel Bot",
+        name: botName,
         icon_url: logoUrl
       },
       footer: {
@@ -294,8 +351,16 @@ function updateStationFuel() {
     if (!esiListSheet) {
       esiListSheet = ss.insertSheet("ESI_List");
       // Set headers for the "ESI_List" sheet
-      esiListSheet.getRange("A1").setValue("Names");
+      esiListSheet.getRange("A1").setValue("Name(s)");
       esiListSheet.getRange("G1").setValue("discordWebHook");
+      esiListSheet.getRange("G4").setValue("Custom Bot Name (optional)");
+      esiListSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
+      esiListSheet.getRange("G7").setValue("Logo URL (optional)");
+      esiListSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
+
+      // Define a range of cells where values should be entered so we can format them differently
+      var valueCells = esiListSheet.getRangeList(['A2','G2','G5','G8'])
+      valueCells.setBackground('yellow')
     }
   
     // Check if the "CleanData" sheet exists, if not, create it
@@ -303,7 +368,7 @@ function updateStationFuel() {
     if (!cleanDataSheet) {
       cleanDataSheet = ss.insertSheet("CleanData");
       // Set formulas for the "CleanData" sheet
-      cleanDataSheet.getRange("C1").setFormula('=IFERROR(SPLIT(CleanData!$D$1, "Z"))');
+      cleanDataSheet.getRange("C1").setFormula('=IFERROR(SPLIT(CleanData!$D$1, "Z"),now())');
       cleanDataSheet.getRange("A2").setFormula('=UNIQUE(Pull!C:C)');
       cleanDataSheet.getRange("B3").setValue('Days Remaining');
       for (var i = 4; i <= 104; i++) {
@@ -334,6 +399,9 @@ function updateStationFuel() {
      instructionsSheet.getRange("A12").setValue("11. Click 'Save'.");
      instructionsSheet.getRange("A13").setValue("12. Repeat steps 6-11 for the 'updateStationFuel' function, but set the frequency to 'Day timer' set time of day.");
      instructionsSheet.getRange("A14").setValue("13. Repeat steps 6-11 for the 'reportStatusToDiscord' function, but set the frequency to 'Day Timer' and an hour later then updateStationFuel.");
+     instructionsSheet.getRange("A16").setValue("NOTE: If you see a GESI undefined error, you probably need to enable the GESI Script library in Extensions->AppScripts->Libraries mentioned in Step 3.");
+     instructionsSheet.getRange("A18").setValue("When you first run this, Google will warn you that this app has not been approved by Google -- which is true. You will need to go to 'Advanced' to enable it.");
+     instructionsSheet.getRange("A20").setValue("You can set custom values for the name and logo of your app in ESI_List. (optional)")
    }
  
    // Display a dependency prompt

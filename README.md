@@ -15,7 +15,11 @@ Automatically track your structure fuel levels and get daily Discord notificatio
 2. An EVE Online character with permission to view your structures
 3. A Discord server where you can create a webhook
 
-## Setup (15 minutes)
+## If You Need Help
+- Paste the Claude.md file into your LLM. It has everything an LLM needs to know to help you get set up. 
+- Join my Discord and post your questions or suggestions for improvements: [Orthel's Lab](https://discord.gg/5FdUr9KRde)
+
+## Setup (5-10 minutes)
 
 ### Step 1: Create Your Google Sheet
 
@@ -116,6 +120,8 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 
 **Authorization errors**: Make sure you've completed Step 5 to authenticate your EVE character.
 
+**Editing fuel-tracker.gs locally**: The `.gs` file extension may not be recognized by your code editor. Configure your editor to treat `.gs` files as JavaScript for proper syntax highlighting. For example, in VSCode, add `"*.gs": "javascript"` to your file associations setting.
+
 ## Optional Customization
 
 In the **Settings** sheet, you can:
@@ -135,7 +141,7 @@ If you don't already have the GESI plugin installed in Google Sheets:
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests!
+Feel free to submit issues and enhancement requests! PRs are welcome if you have ideas for improvements. 
 
 ## License
 

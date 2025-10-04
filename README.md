@@ -55,13 +55,12 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 
 1. Go to the **Settings** sheet
 2. In **Cell A2**, enter your EVE character name (must be exact, case-sensitive)
-3. Click **Fuel stuff** → **Update Station Fuel**
-4. A GESI authorization dialog will appear - click **Authorize**
-5. Sign in with your Google account and grant permissions
-6. A new tab will open for EVE SSO login
-7. Log in with the EVE Online account for the character you entered
-8. Review the requested scopes and click **Authorize**
-9. Close the EVE SSO tab and return to Google Sheets
+3. Click **Extensions** → **GESI** → **Authorize Character**
+4. A new tab will open for EVE SSO login
+5. Log in with the EVE Online account for the character you entered in Cell A2
+6. Review the requested scopes and click **Authorize**
+7. Close the EVE SSO tab and return to Google Sheets
+8. Click **Fuel stuff** → **Update Station Fuel** to verify authentication worked. The Pull sheet and CleadData sheets should be populated with your structures. 
 
 **Required Character Roles:** Your character must have the **Station Manager** or **Director** corporation role.
 
@@ -111,7 +110,7 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 
 **"GESI is not defined" error**: Go back to Step 2 and make sure you added the GESI library correctly.
 
-**No structures showing**: Verify you have authenticated your character (step 5), your character name is spelled exactly right and that your character has the **Station Manager** or **Director** role.
+**No structures showing**: Verify you have authenticated your character (Step 5), your character name is spelled exactly right and that your character has the **Station Manager** or **Director** role.
 
 **No Discord message**: Double-check your webhook URL in cell G2 of the Settings sheet.
 

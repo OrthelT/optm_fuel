@@ -16,7 +16,7 @@ Automatically track your structure fuel levels and get daily Discord notificatio
 3. A Discord server where you can create a webhook
 
 ## If You Need Help
-- Paste the Claude.md file into your LLM. It has everything an LLM needs to know to help you get set up. 
+- The LLM_GUIDE.md file has everything an LLM needs to know to help you get set up. Point your LLM at this repo or paste it into your LLM chat bot.
 - Join my Discord and post your questions or suggestions for improvements: [Orthel's Lab](https://discord.gg/5FdUr9KRde)
 
 ## Setup (5-10 minutes)

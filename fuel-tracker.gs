@@ -39,7 +39,7 @@ function onOpen() {
   }
 
   function getCorpName() {
-    //Gets the name of the corp associated with the main character listed at ESI_List cell A2.
+    //Gets the name of the corp associated with the main character listed at Settings cell A2.
     var charinfo = GetCharInfo();
     var corpID = charinfo.corporation_id
     var corpName = GESI.corporations_corporation(corpID)[1][8]
@@ -47,7 +47,7 @@ function onOpen() {
   }
 
   function getCorpLogoUrl() {
-    // Returns the Eve image server URL of the corp logo for the main character listed at ESI_List cell A2 
+    // Returns the Eve image server URL of the corp logo for the main character listed at Settings cell A2
     var charinfo = GetCharInfo();
     var logoUrl = "https://images.evetech.net/corporations/"+charinfo.corporation_id+"/logo?size=64";
 
@@ -55,14 +55,14 @@ function onOpen() {
   }
 
   function GetCharInfo() {
-    //Gets info about the main character listed at ESI_List cell A2 and returns a dictionary of information.
-    
+    //Gets info about the main character listed at Settings cell A2 and returns a dictionary of information.
+
     // Get the stored ID of the spreadsheet
     var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
     // Get the spreadsheet by its ID
     var ss = SpreadsheetApp.openById(spreadsheetId);
-    var eList = ss.getSheetByName("ESI_List");
-    var mainchar = eList.getRange("A2").getValue();
+    var settingsSheet = ss.getSheetByName("Settings");
+    var mainchar = settingsSheet.getRange("A2").getValue();
     var charinfo = GESI.getCharacterData(mainchar);
     Logger.log("data: %s",charinfo)
 
@@ -114,19 +114,19 @@ function updateStationFuel() {
     var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
     // Get the spreadsheet by its ID
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    var esiListSheet = spreadsheet.getSheetByName("ESI_List");
+    var settingsSheet = spreadsheet.getSheetByName("Settings");
     var pullSheet = spreadsheet.getSheetByName("Pull");
-  
+
     // If the 'Pull' sheet does not exist, create it.
     if (!pullSheet) {
       pullSheet = spreadsheet.insertSheet("Pull");
     }
-  
+
     // Clear the 'Pull' sheet.
     pullSheet.clear();
-  
-    // Get the names from the 'ESI_List' sheet.
-    var names = esiListSheet.getRange("A2:A").getValues();
+
+    // Get the names from the 'Settings' sheet.
+    var names = settingsSheet.getRange("A2:A").getValues();
   
     // Initialize the row counter for the 'Pull' sheet.
     var pullSheetRow = 3;
@@ -172,20 +172,20 @@ function updateStationFuel() {
     // Get the spreadsheet by its ID
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       
-    // Get the Discord webhook URL from cell G2 of the "CleanData" sheet
-    var discordWebhookUrl = spreadsheet.getSheetByName("ESI_List").getRange("G2").getValue();   
+    // Get the Discord webhook URL from cell G2 of the "Settings" sheet
+    var discordWebhookUrl = spreadsheet.getSheetByName("Settings").getRange("G2").getValue();
 
     // Get the sheet named "CleanData" from the active spreadsheet
     var sheet = spreadsheet.getSheetByName("CleanData");
-  
+
     // Get all the data from the "CleanData" sheet
     var data = sheet.getDataRange().getValues();
     var timeupdate = data[0][4];
 
     // set name and logo for the Discord Bot. Either corp name/logo (default) or custon name/logo (optional)
-    var esisheet = spreadsheet.getSheetByName("ESI_List");
-    var customName = esisheet.getRange('G5').getValue();
-    var customURL = esisheet.getRange('G8').getValue();
+    var settingsSheet = spreadsheet.getSheetByName("Settings");
+    var customName = settingsSheet.getRange('G5').getValue();
+    var customURL = settingsSheet.getRange('G8').getValue();
 
     // Use customn name if configured or <CorpName> Fuel Bot if not
     if (customName) {
@@ -346,20 +346,20 @@ function updateStationFuel() {
       pullSheet = ss.insertSheet("Pull");
     }
   
-    // Check if the "ESI_List" sheet exists, if not, create it
-    var esiListSheet = ss.getSheetByName("ESI_List");
-    if (!esiListSheet) {
-      esiListSheet = ss.insertSheet("ESI_List");
-      // Set headers for the "ESI_List" sheet
-      esiListSheet.getRange("A1").setValue("Name(s)");
-      esiListSheet.getRange("G1").setValue("discordWebHook");
-      esiListSheet.getRange("G4").setValue("Custom Bot Name (optional)");
-      esiListSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
-      esiListSheet.getRange("G7").setValue("Logo URL (optional)");
-      esiListSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
+    // Check if the "Settings" sheet exists, if not, create it
+    var settingsSheet = ss.getSheetByName("Settings");
+    if (!settingsSheet) {
+      settingsSheet = ss.insertSheet("Settings");
+      // Set headers for the "Settings" sheet
+      settingsSheet.getRange("A1").setValue("Name(s)");
+      settingsSheet.getRange("G1").setValue("discordWebHook");
+      settingsSheet.getRange("G4").setValue("Custom Bot Name (optional)");
+      settingsSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
+      settingsSheet.getRange("G7").setValue("Logo URL (optional)");
+      settingsSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
 
       // Define a range of cells where values should be entered so we can format them differently
-      var valueCells = esiListSheet.getRangeList(['A2','G2','G5','G8'])
+      var valueCells = settingsSheet.getRangeList(['A2','G2','G5','G8'])
       valueCells.setBackground('yellow')
     }
   
@@ -386,8 +386,8 @@ function updateStationFuel() {
      instructionsSheet = ss.insertSheet("Instructions");
      // Write the instructions to the "Instructions" sheet
      instructionsSheet.getRange("A1").setValue("Instructions for setting up the script:");
-     instructionsSheet.getRange("A2").setValue("1. Enter the EVE character names in column A of the 'ESI_List' sheet, starting from cell A2.");
-     instructionsSheet.getRange("A3").setValue("2. Enter the Discord webhook URL in cell G2 of the 'ESI_List' sheet.");
+     instructionsSheet.getRange("A2").setValue("1. Enter the EVE character name in cell A2 of the 'Settings' sheet.");
+     instructionsSheet.getRange("A3").setValue("2. Enter the Discord webhook URL in cell G2 of the 'Settings' sheet.");
      instructionsSheet.getRange("A4").setValue("3. Make sure GESI is setup from https://blacksmoke16.github.io/GESI/");
      instructionsSheet.getRange("A5").setValue("4. Open the App Script editor by clicking on 'Extensions' > 'Apps Script'.");
      instructionsSheet.getRange("A6").setValue("5. Click on the clock icon, which represents 'Triggers' in the left sidebar.");
@@ -401,7 +401,7 @@ function updateStationFuel() {
      instructionsSheet.getRange("A14").setValue("13. Repeat steps 6-11 for the 'reportStatusToDiscord' function, but set the frequency to 'Day Timer' and an hour later then updateStationFuel.");
      instructionsSheet.getRange("A16").setValue("NOTE: If you see a GESI undefined error, you probably need to enable the GESI Script library in Extensions->AppScripts->Libraries mentioned in Step 3.");
      instructionsSheet.getRange("A18").setValue("When you first run this, Google will warn you that this app has not been approved by Google -- which is true. You will need to go to 'Advanced' to enable it.");
-     instructionsSheet.getRange("A20").setValue("You can set custom values for the name and logo of your app in ESI_List. (optional)")
+     instructionsSheet.getRange("A20").setValue("You can set custom values for the name and logo of your app in Settings. (optional)")
    }
  
    // Display a dependency prompt

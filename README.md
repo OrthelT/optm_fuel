@@ -1,56 +1,113 @@
 # EVE Online Structure Fuel Tracker
 
-A Google Apps Script project that automates fuel status tracking for EVE Online structures. This script integrates with Google Sheets, EVE Online's ESI API (via GESI), and Discord to provide timely updates about structure fuel levels.
+Automatically track your structure fuel levels and get daily Discord notifications. No coding required!
 
-## Features
+## What You'll Get
 
-- Automatically pulls structure fuel data from EVE Online using GESI
-- Processes and cleans the data in Google Sheets
-- Sends formatted fuel status updates to Discord
-- Supports multiple structures and corporations
-- Provides time-based automated updates
-- Custom Google Sheets menu for manual operations
+- Daily Discord updates showing which structures need fuel
+- Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
+- Automatic updates - set it once and forget it
+- Supports multiple characters and structures
 
-## Prerequisites
+## What You Need
 
-1. Google Sheets account
-2. [GESI](https://blacksmoke16.github.io/GESI/) setup for EVE Online API access
-3. Discord webhook URL for notifications
-4. EVE Online character(s) with appropriate structure viewing permissions
+1. A Google account
+2. An EVE Online character with permission to view your structures
+3. A Discord server where you can create a webhook
 
-## Setup Instructions
+## Setup (15 minutes)
 
-1. Create a new Google Sheet
-2. Set up GESI following instructions at https://blacksmoke16.github.io/GESI/
-3. Copy the script code to Google Apps Script editor
-4. Run the setup function from the "Setup" menu
-5. Follow the instructions provided in the "Instructions" sheet:
-   - Enter EVE character names in the ESI_List sheet
-   - Configure Discord webhook URL
-   - Set up time-based triggers for automated updates
+### Step 1: Create Your Google Sheet
 
-## Sheets Structure
+1. Go to [Google Sheets](https://sheets.google.com) and create a new blank spreadsheet
+2. Name it something like "EVE Fuel Tracker"
 
-The script creates and manages several sheets:
-- **Pull**: Raw data from EVE Online API
-- **ESI_List**: Configuration for character names and Discord webhook
-- **CleanData**: Processed fuel status data
-- **Instructions**: Setup and configuration instructions
+### Step 2: Install GESI (EVE API Connection)
 
-## Time-Based Triggers
+GESI is a library that connects Google Sheets to EVE Online's API. [Learn more about GESI](https://github.com/Blacksmoke16/GESI)
 
-The script uses three main time-based triggers:
-1. `getUtcTimestampToS2`: Runs every 6 hours
-2. `updateStationFuel`: Runs daily at a specified time
-3. `reportStatusToDiscord`: Runs daily, one hour after updateStationFuel
+1. In your Google Sheet, click **Extensions** → **Apps Script**
+2. In the Apps Script editor, click the **+** next to "Libraries" on the left
+3. Paste this Script ID: `1T9dLrcriMPPYiFNiOSrAeGBj3M6Rf2RLvXaNPe_MNk5QjWF1kEPmN88M`
+4. Click **Look up**, then click **Add**
+5. Close the Apps Script tab and return to your Google Sheet
 
-## Discord Notifications
+### Step 3: Add the Fuel Tracker Script
 
-The script sends formatted messages to Discord including:
-- Structure names
-- Time remaining until fuel expiration
-- Relative and absolute timestamps
-- Visual emphasis for structures with less than 7 days of fuel
+1. In your Google Sheet, click **Extensions** → **Apps Script** again
+2. Delete any existing code in the editor
+3. Copy all the code from [fuel-tracker.gs](fuel-tracker.gs) and paste it into the editor
+4. Click the **Save** icon (💾)
+5. Close the Apps Script tab and return to your Google Sheet
+
+### Step 4: Run Initial Setup
+
+1. Refresh your Google Sheet page (press F5)
+2. You'll see a new menu called **Setup** at the top
+3. Click **Setup** → **Setup**
+4. Google will ask for permissions - click **Continue** → **Advanced** → **Go to [your project name]** → **Allow**
+5. The script will create several sheets in your workbook
+
+### Step 5: Configure Your Settings
+
+1. Go to the **ESI_List** sheet
+2. In the yellow cells, enter:
+   - **Cell A2**: Your EVE character name (must be exact, case-sensitive)
+   - **Cell G2**: Your Discord webhook URL (see below to create one)
+3. Add more character names in A3, A4, etc. if you have multiple characters
+
+**To create a Discord webhook:**
+1. In Discord, go to Server Settings → Integrations → Webhooks
+2. Click **New Webhook**
+3. Choose the channel for notifications
+4. Click **Copy Webhook URL**
+5. Paste it into cell G2
+
+### Step 6: Set Up Automation
+
+1. Click **Extensions** → **Apps Script**
+2. Click the clock icon ⏰ on the left (Triggers)
+3. Click **+ Add Trigger** (bottom right) and configure:
+   - Function: **updateStationFuel**
+   - Event source: **Time-driven**
+   - Type: **Day timer**
+   - Time: Choose when you want updates (e.g., 8am-9am)
+   - Click **Save**
+
+4. Click **+ Add Trigger** again:
+   - Function: **reportStatusToDiscord**
+   - Event source: **Time-driven**
+   - Type: **Day timer**
+   - Time: Choose 1 hour after the previous trigger
+   - Click **Save**
+
+5. Click **+ Add Trigger** one more time:
+   - Function: **getUtcTimestampToS2**
+   - Event source: **Time-driven**
+   - Type: **Hours timer**
+   - Hours interval: **Every 6 hours**
+   - Click **Save**
+
+### Step 7: Test It
+
+1. Return to your Google Sheet
+2. Click **Fuel stuff** menu → **Update Station Fuel**
+3. Wait 30 seconds, then click **Fuel stuff** → **Report Status to Discord**
+4. Check your Discord channel for the fuel report!
+
+## Troubleshooting
+
+**"GESI is not defined" error**: Go back to Step 2 and make sure you added the GESI library correctly.
+
+**No structures showing**: Verify your character name is spelled exactly right and that your character has permission to view structures.
+
+**No Discord message**: Double-check your webhook URL in cell G2 of the ESI_List sheet.
+
+## Optional Customization
+
+In the **ESI_List** sheet, you can:
+- **Cell G5**: Change the bot name (default: "[Your Corp] Fuel Bot")
+- **Cell G8**: Use a custom logo URL (default: your corp logo)
 
 ## Contributing
 

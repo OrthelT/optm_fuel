@@ -22,16 +22,16 @@ Automatically track your structure fuel levels and get daily Discord notificatio
 1. Go to [Google Sheets](https://sheets.google.com) and create a new blank spreadsheet
 2. Name it something like "EVE Fuel Tracker"
 
-### Step 2: Install GESI (EVE API Connection)
+### Step 2: Install GESI Library (Required)
 
 GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documentation](https://github.com/Blacksmoke16/GESI)
 
 1. In your Google Sheet, click **Extensions** → **Apps Script**
 2. In the Apps Script editor, click the **+** next to "Libraries" on the left
-3. Paste this Script ID: 
-```1KjnRVVFr2KiHH55sqBfHcZ-yXweJ7iv89V99ubaLy4A7B_YH8rB5u0s3```
-4. Click **Look up**, select the most recent version that is NOT "HEAD", then click **Add**
-5. Close the Apps Script tab and return to your Google Sheet
+3. Paste this Script ID: `1KjnRVVFr2KiHH55sqBfHcZ-yXweJ7iv89V99ubaLy4A7B_YH8rB5u0s3`
+4. Click **Look up**, select the latest version, then click **Add**
+5. Ensure the identifier is set to `GESI`
+6. Close the Apps Script tab and return to your Google Sheet
 
 ### Step 3: Add the Fuel Tracker Script
 
@@ -49,13 +49,25 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 4. Google will ask for permissions - click **Continue** → **Advanced** → **Go to [your project name]** → **Allow**
 5. The script will create several sheets in your workbook
 
-### Step 5: Configure Your Settings
+### Step 5: Authenticate Your EVE Character
+
+**If you don't have the GESI plugin installed**, see "Installing GESI Plugin" at the end of this guide.
 
 1. Go to the **ESI_List** sheet
-2. In the yellow cells, enter:
-   - **Cell A2**: Your EVE character name (must be exact, case-sensitive)
-   - **Cell G2**: Your Discord webhook URL (see below to create one)
-3. Add more character names in A3, A4, etc. if you have multiple characters
+2. In **Cell A2**, enter your EVE character name (must be exact, case-sensitive)
+3. Click **Fuel stuff** → **Update Station Fuel**
+4. A GESI authorization dialog will appear - click **Authorize**
+5. Sign in with your Google account and grant permissions
+6. A new tab will open for EVE SSO login
+7. Log in with the EVE Online account for the character you entered
+8. Review the requested scopes and click **Authorize**
+9. Close the EVE SSO tab and return to Google Sheets
+
+**Required Character Roles:** Your character must have the **Station Manager** or **Director** corporation role.
+
+### Step 6: Configure Discord Webhook
+
+1. In the **ESI_List** sheet, enter your Discord webhook URL in **Cell G2**
 
 **To create a Discord webhook:**
 1. In Discord, go to Server Settings → Integrations → Webhooks
@@ -64,7 +76,7 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 4. Click **Copy Webhook URL**
 5. Paste it into cell G2 of **ESI_List**
 
-### Step 6: Set Up Automation
+### Step 7: Set Up Automation
 
 1. Click **Extensions** → **Apps Script**
 2. Click the clock icon ⏰ on the left (Triggers)
@@ -89,26 +101,39 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
    - Hours interval: **Every 6 hours**
    - Click **Save**
 
-### Step 7: Test It
+### Step 8: Test It
 
 1. Return to your Google Sheet
-2. Click **Fuel stuff** menu → **Update Station Fuel**
-3. Wait 30 seconds, then click **Fuel stuff** → **Report Status to Discord**
-4. Check your Discord channel for the fuel report!
+2. Click **Fuel stuff** menu → **Report Status to Discord**
+3. Check your Discord channel for the fuel report!
 
 ## Troubleshooting
 
 **"GESI is not defined" error**: Go back to Step 2 and make sure you added the GESI library correctly.
 
-**No structures showing**: Verify your character name is spelled exactly right and that your character has permission to view structures.
+**No structures showing**: Verify you have authenticated your character (step 5), your character name is spelled exactly right and that your character has the **Station Manager** or **Director** role.
 
 **No Discord message**: Double-check your webhook URL in cell G2 of the ESI_List sheet.
+
+**Authorization errors**: Make sure you've completed Step 5 to authenticate your EVE character.
 
 ## Optional Customization
 
 In the **ESI_List** sheet, you can:
 - **Cell G5**: Change the bot name (default: "[Your Corp] Fuel Bot")
 - **Cell G8**: Use a custom logo URL (default: your corp logo)
+- **Multiple Characters**: Add additional character names in cells A3, A4, etc. (each will require separate authentication)
+
+## Installing GESI Plugin
+
+If you don't already have the GESI plugin installed in Google Sheets:
+
+1. In your Google Sheet, click **Extensions** → **Add-ons** → **Get add-ons**
+2. Search for **GESI** in the Google Workspace Marketplace
+3. Click on GESI and then click **Install**
+4. Select your Google account and grant permissions
+5. After installation, click **Extensions** → **GESI** → **Authorize Character**
+6. Follow the authorization prompts to link your EVE Online account
 
 ## Contributing
 
@@ -116,4 +141,4 @@ Feel free to submit issues and enhancement requests!
 
 ## License
 
-MIT License - See LICENSE file for details 
+MIT License - See LICENSE file for details

@@ -53,6 +53,35 @@ Three scheduled functions maintain automation:
 2. `updateStationFuel` - Daily at configured time
 3. `reportStatusToDiscord` - Daily, 1 hour after updateStationFuel
 
+## Setup Instructions
+
+### Installing GESI Library (Required)
+
+1. Open your Google Sheet and go to **Extensions → Apps Script**
+2. In the Apps Script editor, click the **+** next to "Libraries" in the left sidebar
+3. Enter Script ID: `1KjnRVVFr2KiHH55sqBfHcZ-yXweJ7iv89V99ubaLy4A7B_YH8rB5u0s3`
+4. Click **Look up** → Select the latest version → Click **Add**
+5. Set the identifier to `GESI` (if not already set)
+
+### Authenticating Characters
+
+1. **If you don't have the GESI plugin installed**, see "Installing GESI Plugin" section at the end of this document
+2. In your Google Sheet, enter a character name in the **ESI_List** sheet (cell A2)
+3. Run the script for the first time (use **Fuel stuff → Update Structure Fuel**)
+4. A GESI authorization dialog will appear - click **Authorize**
+5. Sign in with your Google account and grant permissions
+6. A new tab will open for EVE SSO login
+7. Log in with the EVE Online account for the character you entered
+8. Review the requested scopes and click **Authorize**
+9. Close the EVE SSO tab and return to Google Sheets
+
+**Required Character Roles:**
+- The character must have the **Station Manager** or **Director** corporation role to access structure data
+
+**Multiple Characters:**
+- Add additional character names in ESI_List (A3, A4, etc.)
+- Each character will trigger its own authorization flow on first use
+
 ## Development Notes
 
 **Editing the Script:**
@@ -108,3 +137,14 @@ Three scheduled functions maintain automation:
 - Run `updateStationFuel()` manually from Fuel stuff menu
 - Run `reportStatusToDiscord()` manually to test Discord output
 - Check Apps Script logs: View → Logs in the Apps Script editor
+
+## Installing GESI Plugin
+
+If you don't already have the GESI plugin installed in Google Sheets:
+
+1. In your Google Sheet, click **Extensions** → **Add-ons** → **Get add-ons**
+2. Search for **GESI** in the Google Workspace Marketplace
+3. Click on GESI and then click **Install**
+4. Select your Google account and grant permissions
+5. After installation, click **Extensions** → **GESI** → **Authorize Character**
+6. Follow the authorization prompts to link your EVE Online account

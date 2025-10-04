@@ -60,7 +60,7 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 5. Log in with the EVE Online account for the character you entered in Cell A2
 6. Review the requested scopes and click **Authorize**
 7. Close the EVE SSO tab and return to Google Sheets
-8. Click **Fuel stuff** → **Update Station Fuel** to verify authentication worked. The Pull sheet and CleadData sheets should be populated with your structures. 
+8. Click **Fuel stuff** → **Update Station Fuel** to verify authentication worked. The Pull sheet and CleanData sheets should be populated with your structures. 
 
 **Required Character Roles:** Your character must have the **Station Manager** or **Director** corporation role.
 

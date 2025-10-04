@@ -191,8 +191,7 @@ function updateStationFuel() {
     if (customName) {
       var botName = customName;
     } else {
-      corpID = GetCharInfo().corporation_id;
-      corpName = getCorpName();
+      var corpName = getCorpName();
       var botName = corpName + " Fuel Bot";
     }
     

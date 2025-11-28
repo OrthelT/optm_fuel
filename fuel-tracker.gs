@@ -143,19 +143,20 @@ function updateStationFuel() {
       if (names[i][0] !== "") {
         // Call the 'corporations_corporation_structures' function with the current name.
         var result = GESI.corporations_corporation_structures("en", names[i][0]);
-  
+
         // If the 'result' array is not empty, populate the 'Pull' sheet with the data.
-      
+
         if (Array.isArray(result) && result.length > 0) {
           pullSheet.getRange(pullSheetRow, 1, result.length, result[0].length).setValues(result);
           pullSheetRow += result.length + 5;  // Skip 5 rows after each output.
         }
-  
+
         // Wait for 5 seconds before moving to the next name.
         Utilities.sleep(5000);
       }
     }
-  }
+}
+
   
   // I want to sort a multi-dim array so I have to write a custom sort function
   // sort() will send the two elements that it is comparing to this function
@@ -412,5 +413,5 @@ function updateStationFuel() {
  
    // Display a dependency prompt
    var ui = SpreadsheetApp.getUi();
-   ui.alert('Please setup GESI from https://blacksmoke16.github.io/GESI/');
+   ui.alert('Setup complete. If you have not already done so, please setup GESI from https://blacksmoke16.github.io/GESI/');
  }

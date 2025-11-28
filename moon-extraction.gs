@@ -50,65 +50,79 @@ function updateMoonExtractions() {
     setupMoonSheets();
     moonPullSheet = ss.getSheetByName("MoonPull");
   }
-  
+
   // Clear old data (keep headers)
   if (moonPullSheet.getLastRow() > 1) {
     moonPullSheet.getRange(2, 1, moonPullSheet.getLastRow() - 1, moonPullSheet.getLastColumn()).clearContent();
   }
 
-  var charInfo = GetCharInfo(); // Reusing from fuel-tracker.gs
-  var corpId = charInfo.corporation_id;
-  
+  // Get character name from Settings sheet for GESI authentication
+  var settingsSheet = ss.getSheetByName("Settings");
+  var characterName = settingsSheet.getRange("A2").getValue();
+
+  if (!characterName) {
+    Logger.log("No character name found in Settings A2");
+    return;
+  }
+
   try {
-    var extractions = GESI.corporations_corporation_mining_extractions("en", corpId);
+    // Pass language and character name for authentication
+    var extractions = GESI.corporations_corporation_mining_extractions("en", characterName);
   } catch (e) {
     Logger.log("Error fetching extractions: " + e);
     return;
   }
 
-  if (!extractions || extractions.length === 0) {
+  if (!extractions || extractions.length <= 1) {
     Logger.log("No extractions found.");
     return;
   }
 
+  // GESI returns a 2D array where row 0 contains column headers
+  // Find column indices from headers
+  var headers = extractions[0];
+  var colStructureId = headers.indexOf("structure_id");
+  var colMoonId = headers.indexOf("moon_id");
+  var colExtractionStart = headers.indexOf("extraction_start_time");
+  var colChunkArrival = headers.indexOf("chunk_arrival_time");
+  var colNaturalDecay = headers.indexOf("natural_decay_time");
+
   var outputData = [];
-  
+
   // Cache for structure and moon names to avoid repeated API calls
   var structureCache = {};
   var moonCache = {};
 
-
-
-  for (var i = 0; i < extractions.length; i++) {
+  // Start from row 1 to skip headers
+  for (var i = 1; i < extractions.length; i++) {
     var ex = extractions[i];
 
-    
-    var structureId = ex.structure_id;
-    var moonId = ex.moon_id;
-    
+    var structureId = ex[colStructureId];
+    var moonId = ex[colMoonId];
+
     var structureName = structureCache[structureId];
     if (!structureName) {
-      structureName = getStructureName(structureId);
+      structureName = getStructureName(structureId, characterName);
       structureCache[structureId] = structureName;
     }
-    
+
     var moonName = moonCache[moonId];
     if (!moonName) {
       moonName = getMoonName(moonId);
       moonCache[moonId] = moonName;
     }
-    
+
     outputData.push([
       structureName,
       moonName,
-      ex.extraction_start_time,
-      ex.chunk_arrival_time,
-      ex.natural_decay_time,
+      ex[colExtractionStart],
+      ex[colChunkArrival],
+      ex[colNaturalDecay],
       structureId
     ]);
-    
+
     // Avoid rate limits
-    Utilities.sleep(100); 
+    Utilities.sleep(100);
   }
   
   if (outputData.length > 0) {
@@ -116,11 +130,23 @@ function updateMoonExtractions() {
   }
 }
 
-function getStructureName(structureId) {
+function getStructureName(structureId, characterName) {
   try {
-    // Try to get from GESI
-    var structure = GESI.universe_structures_structure(structureId);
-    return structure.name;
+    // Get structure info - requires authentication for player-owned structures
+    // GESI returns a 2D array: [[header1, header2, ...], [value1, value2, ...]]
+    var structure = GESI.universe_structures_structure(structureId, characterName);
+
+    // Find the 'name' column index from headers
+    if (structure && structure.length > 1) {
+      var headers = structure[0];
+      var nameIndex = headers.indexOf("name");
+      if (nameIndex >= 0) {
+        return structure[1][nameIndex];
+      }
+    }
+
+    Logger.log("Could not parse structure name for " + structureId);
+    return "Unknown Structure (" + structureId + ")";
   } catch (e) {
     Logger.log("Failed to resolve structure name for " + structureId + ": " + e);
     return "Unknown Structure (" + structureId + ")";
@@ -129,8 +155,20 @@ function getStructureName(structureId) {
 
 function getMoonName(moonId) {
   try {
+    // GESI returns a 2D array: [[header1, header2, ...], [value1, value2, ...]]
     var moon = GESI.universe_moons_moon(moonId);
-    return moon.name;
+
+    // Find the 'name' column index from headers
+    if (moon && moon.length > 1) {
+      var headers = moon[0];
+      var nameIndex = headers.indexOf("name");
+      if (nameIndex >= 0) {
+        return moon[1][nameIndex];
+      }
+    }
+
+    Logger.log("Could not parse moon name for " + moonId);
+    return "Unknown Moon (" + moonId + ")";
   } catch (e) {
     Logger.log("Failed to resolve moon name for " + moonId + ": " + e);
     return "Unknown Moon (" + moonId + ")";
@@ -164,13 +202,7 @@ function reportMoonStatusToDiscord() {
   var logoUrl = customURL ? customURL : getCorpLogoUrl();
 
   var now = new Date();
-  var embeds = [];
-  var hasUpdates = false;
-  
-
-  
   var upcomingExtractions = [];
-  var activeExtractions = [];
   
   // Skip header
   for (var i = 1; i < data.length; i++) {
@@ -182,20 +214,16 @@ function reportMoonStatusToDiscord() {
     var arrivalTime = new Date(arrivalTimeStr);
     var timeDiff = arrivalTime.getTime() - now.getTime();
     var hoursDiff = timeDiff / (1000 * 60 * 60);
-    
 
-    
     var status = "";
-    
-    if (hoursDiff > 23 && hoursDiff <= 24) {
+
+    // Use wider time windows to avoid missing notifications if hourly trigger doesn't align perfectly
+    if (hoursDiff >= 23 && hoursDiff < 25) {
       status = "24h Warning";
-      hasUpdates = true;
-    } else if (hoursDiff > 0 && hoursDiff <= 1) {
+    } else if (hoursDiff >= 0.5 && hoursDiff < 1.5) {
       status = "1h Warning";
-      hasUpdates = true;
-    } else if (hoursDiff <= 0 && hoursDiff > -1) {
+    } else if (hoursDiff >= -0.5 && hoursDiff < 0.5) {
       status = "READY";
-      hasUpdates = true;
     }
     
     if (status) {

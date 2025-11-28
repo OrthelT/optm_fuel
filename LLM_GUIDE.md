@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+This file documents the original version of this project and has since been updated with new features for moon extraction notifications. See extraction_feature.md for details.  
+
 ## Project Overview
 
 EVE Online Structure Fuel Tracker - A Google Apps Script project that automates fuel status tracking for EVE Online structures. Integrates with Google Sheets, EVE Online's ESI API (via GESI), and Discord webhooks to provide automated fuel level updates.

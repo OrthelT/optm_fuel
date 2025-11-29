@@ -226,7 +226,16 @@ function updateFuelStatus() {
           return (a[0] < b[0]) ? -1 : 1;
       }
   }
-  
+  function verify_pulldata(spreadsheet) {
+    var rawPull = spreadsheet.getSheetByName("FuelPull").getDataRange().getValues();
+    if (rawPull[1] == null) {
+      Logger.log("pull data missing, updating now.")
+      return false
+    }
+    Logger.log("pulldata found")
+    Logger.log(rawPull[1])
+    return true
+  }
   // This function reports the status to Discord
   function reportFuelStatusToDiscord() {
     //clear and reset the timestamp
@@ -239,13 +248,18 @@ function updateFuelStatus() {
       
     // Get the Discord webhook URL from cell G2 of the "Settings" sheet
     var discordWebhookUrl = spreadsheet.getSheetByName("Settings").getRange("G2").getValue();
-
+    
+    if (!verify_pulldata(spreadsheet)) {
+      updateFuelStatus()
+    }
+    
     // Get the sheet named "CleanData" from the active spreadsheet
     var sheet = spreadsheet.getSheetByName("CleanData");
 
     // Get all the data from the "CleanData" sheet
     var data = sheet.getDataRange().getValues();
     var timeupdate = data[0][4];
+    Logger.log(data)  
 
     // set name and logo for the Discord Bot. Either corp name/logo (default) or custon name/logo (optional)
     var settingsSheet = spreadsheet.getSheetByName("Settings");

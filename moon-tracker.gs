@@ -246,11 +246,20 @@ function reportHourlyMoonStatusToDiscord() {
   var moonPullSheet = ss.getSheetByName("MoonPull");
   var settingsSheet = ss.getSheetByName("Settings");
 
-  if (!moonPullSheet) return;
+  if (!moonPullSheet) {
+    setupSheetsForNewUser();
+  };
 
-  var data = moonPullSheet.getDataRange().getValues();
-  if (data.length <= 1) return;
-
+  var check_data = moonPullSheet.getDataRange().getValues();
+  if (check_data.length <= 1) {
+    updateMoonExtractions();
+  };
+  data = moonPullSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    ui = SpreadsheetApp.getUi()
+    ui.alert("No moon data found")
+    return;
+  }
   var webhookUrl = settingsSheet.getRange("G3").getValue();
   if (!webhookUrl) return;
 

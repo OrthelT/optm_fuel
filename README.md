@@ -8,12 +8,15 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 - Daily Discord updates showing which structures need fuel
 - Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
 - Automatic updates - set it once and forget it
+<img width="333" height="532" alt="image" src="https://github.com/user-attachments/assets/0f94ac8b-4dc4-4788-be3c-c008b761e7c6" />
 
 ### Moon Bot
 - Daily summary of all moon extractions
 - Advance warnings: 24 hours before and 1 hour before extraction ready time
 - Extraction ready notifications
 - Automatic hourly monitoring
+<img width="381" height="445" alt="image" src="https://github.com/user-attachments/assets/1bcc579e-b54d-4831-900f-2f8fa64526ce" />
+<img width="269" height="160" alt="image" src="https://github.com/user-attachments/assets/7c383411-d2f8-4e81-bf98-a51fe1cfc827" />
 
 ## What You Need
 
@@ -237,6 +240,9 @@ After setup, your spreadsheet will contain:
 ## Contributing
 
 Feel free to submit issues and enhancement requests! PRs are welcome.
+
+
+
 
 ## License
 

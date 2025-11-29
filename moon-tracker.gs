@@ -7,8 +7,6 @@ Menu hook is in fuel-tracker.gs
 Sets up the necessary sheets for the Moon Extraction Monitor.
 */
 
-
-
 /**
  * Fetches moon extractions and updates the MoonPull sheet.
  */
@@ -150,7 +148,7 @@ function getMoonName(moonId) {
  * Reports moon extraction status to Discord.
  * Should be triggered hourly.
  */
-function reportMoonStatusToDiscord() {
+function reportHourlyMoonStatusToDiscord() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var moonPullSheet = ss.getSheetByName("MoonPull");
   var settingsSheet = ss.getSheetByName("Settings");

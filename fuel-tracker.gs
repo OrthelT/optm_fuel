@@ -12,18 +12,18 @@
  * 
  * The script uses time-based triggers to run these functions at specified intervals.
  */
-var ui = SpreadsheetApp.getUi()
+var ss = SpreadsheetApp.getActiveSpreadsheet()
 
 // This function is triggered when the Google Sheets document is opened
 function onOpen() {
     var ui = SpreadsheetApp.getUi();
   
     // Create a custom menu in the spreadsheet named 'Fuel stuff'
-    ui.createMenu('Fuel Status')
+    ui.createMenu('Fuel Bot')
       // Add an item to the custom menu. When this item is clicked, it will trigger the 'updateStationFuel' function
-      .addItem('Update Fuel Status', 'updateFuel')
+      .addItem('Update Fuel Status', 'updateFuelStatus')
       // Add an item to the custom menu. When this item is clicked, it will trigger the 'reportStatusToDiscord' function
-      .addItem('Report Status to Discord', 'reportFuelStatusToDiscord')
+      .addItem('Report Fuel Status to Discord', 'reportFuelStatusToDiscord')
       // Add an item to clear cell D1 on the "CleanData" sheet
       .addItem('Clear Time', 'clearCellS2')
       // Add an item to get the UTC timestamp and output it to cell D1 on the "CleanData" sheet
@@ -31,18 +31,32 @@ function onOpen() {
       .addToUi();
 
     // Create a custom menu for Moon Extraction
-    ui.createMenu('Moon Status')
+    ui.createMenu('Moon Bot')
       .addItem('Update Moon Extractions', 'updateMoonExtractions')
-      .addItem('Report Moon Status', 'reportDailyMoonSummary')
+      .addItem('Report Moon Status to Discord', 'reportDailyMoonSummary')
       .addToUi();
   
     // Create a separate menu for the setup function
     ui.createMenu('Setup')
       // Add an item to get Setup the sheet for a new user
-      .addItem('Setup Fuel and Moon Sheets', 'setupSheetsForNewUser')
+      .addItem('Create Fuel and Moon Sheets', 'setupSheetsForNewUser')
+      .addItem('Configure Settings', 'jumpToSettings')
+      .addItem('Help', 'jumpToInstructions')
+      
       // Add the setup menu to the user interface
       .addToUi();
   }
+
+  function jumpToInstructions() {
+    var _instructions = ss.getSheetByName("Instructions");
+    ss.setActiveSheet(_instructions);
+  }
+
+  function jumpToSettings() {
+    var _settings = ss.getSheetByName("Settings");
+    ss.setActiveSheet(_settings);
+  }
+
 
   function getCorpName() {
     //Gets the name of the corp associated with the main character listed at Settings cell A2.
@@ -157,7 +171,7 @@ function onOpen() {
   }
   
 // This function updates the structures's fuel.
-function updateFuel() {
+function updateFuelStatus() {
 
     //clear and reset the timestamp
     clearCellS2()
@@ -203,10 +217,7 @@ function updateFuel() {
     }
 }
 
-  
-  // I want to sort a multi-dim array so I have to write a custom sort function
-  // sort() will send the two elements that it is comparing to this function
-  // The station name is in element [0] not [0][0] as in teh original array
+
   function sortFunction(a, b) {
       if (a[0] === b[0]) {
           return 0;
@@ -443,12 +454,19 @@ function updateFuel() {
      instructionsSheet.getRange("A11").setValue("9. Under 'Select event source', choose 'Time-driven'.");
      instructionsSheet.getRange("A12").setValue("10. Configure the frequency of the trigger to 'Every 6 hours'.");
      instructionsSheet.getRange("A13").setValue("11. Click 'Save'.");
-     instructionsSheet.getRange("A14").setValue("12. Repeat steps 6-11 for the 'updateFuel' function, but set the frequency to 'Day timer' set time of day.");
-     instructionsSheet.getRange("A15").setValue("13. Repeat steps 6-11 for the 'reportStatusToDiscord' function, but set the frequency to 'Day Timer' and an hour later then updateStationFuel.");
+     instructionsSheet.getRange("A14").setValue("12. Repeat steps 6-11 for the 'updateFuelStatus' and 'updateMoonExtractions' function, but set the frequency to 'Day timer' set time of day.");
+     instructionsSheet.getRange("A15").setValue("13. Repeat steps 6-11 for the 'report(Moon/Fuel)StatusToDiscord' functions, but set the frequency to 'Day Timer' set later than the update functions in step 12 to make sure that the data has been refreshed before sending to Discord.");
+     instructionsSheet.getRange("A16").setValue("14. Repeat steps 6-11 for the 'reportHourlyMoonStatusToDiscord' function, set the frequency to 'Hourly.' Configure the frequency of the trigger to 'Every 1 hour'");
+     
+
      instructionsSheet.getRange("A20").setValue("NOTE: If you see a GESI undefined error, you probably need to enable the GESI Script library in Extensions->AppScripts->Libraries mentioned in Step 3.");
      instructionsSheet.getRange("A22").setValue("When you first run this, Google will warn you that this app has not been approved by Google -- which is true. You will need to go to 'Advanced' to enable it.");
      instructionsSheet.getRange("A23").setValue("You can set custom values for the name and logo of your app in Settings. (optional)")
+     instructionsSheet.getRange("A25").setValue("For more detailed instructions go to https://github.com/OrthelT/optm_fuel/blob/main/README.md")
+   
    }
+
+
 
     // Check if the "Settings" sheet exists, if not, create it
     var settingsSheet = ss.getSheetByName("Settings");
@@ -458,13 +476,14 @@ function updateFuel() {
       settingsSheet.getRange("A1").setValue("Name(s)");
       settingsSheet.getRange("G1").setValue("discordWebHook");
       settingsSheet.getRange("F2").setValue("Fuel Webhook");
+      settingsSheet.getRange("F3").setValue("Moon Webhook")
       settingsSheet.getRange("G4").setValue("Custom Bot Name (optional)");
       settingsSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
       settingsSheet.getRange("G7").setValue("Logo URL (optional)");
       settingsSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
 
       // Define a range of cells where values should be entered so we can format them differently
-      var valueCells = settingsSheet.getRangeList(['A2','G2','G5','G8'])
+      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8'])
       valueCells.setBackground('yellow')
     }
     //setup moon sheets (code is in moon_tracker.gs)

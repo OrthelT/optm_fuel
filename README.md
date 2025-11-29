@@ -17,7 +17,7 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 <img width="269" height="160" alt="image" src="https://github.com/user-attachments/assets/7c383411-d2f8-4e81-bf98-a51fe1cfc827" />
 
 ### Customizable Corp Branding
-- Automatically incorporates corp branding, including corp name and logo, by default. 
+- Automatically incorporates corp branding, including your corp's name and logo, by default. 
 - Custom bot name and logo can be configured on the setting sheet.
 
 ## What You Need

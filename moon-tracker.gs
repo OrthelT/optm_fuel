@@ -1,44 +1,13 @@
-/**
- * Moon Extraction Monitor
- * 
- * This script monitors moon extractions and sends Discord notifications.
- * It operates independently from the main fuel tracker but shares the GESI configuration.
- */
 
-// Menu hook is in fuel-tracker.gs
+/*
+Moon Extraction Monitor
+This script monitors moon extractions and sends Discord notifications.
+It operates independently from the main fuel tracker but shares the GESI configuration.
+Menu hook is in fuel-tracker.gs
+Sets up the necessary sheets for the Moon Extraction Monitor.
+*/
 
-/**
- * Sets up the necessary sheets for the Moon Extraction Monitor.
- */
-function setupMoonSheets() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  // 1. Setup MoonPull sheet
-  var moonPullSheet = ss.getSheetByName("MoonPull");
-  if (!moonPullSheet) {
-    moonPullSheet = ss.insertSheet("MoonPull");
-    moonPullSheet.getRange("A1:F1").setValues([["Structure Name", "Moon Name", "Extraction Start", "Chunk Arrival", "Natural Decay", "Structure ID"]]);
-    moonPullSheet.getRange("A1:F1").setFontWeight("bold");
-  }
 
-  // 2. Setup Settings for Moon Webhook
-  var settingsSheet = ss.getSheetByName("Settings");
-  if (!settingsSheet) {
-    // Should exist if fuel tracker is set up, but just in case
-    settingsSheet = ss.insertSheet("Settings");
-  }
-  
-  // Check if G3 is already set (Moon Webhook)
-  var moonWebhookLabel = settingsSheet.getRange("G3");
-  if (moonWebhookLabel.getValue() === "") {
-
-    settingsSheet.getRange("F3").setValue("Moon Webhook:");
-    settingsSheet.getRange("G3").setValue("https://discord.com/api/webhooks/1443330282903306261/VOWsG9E7y-0qxjP7pKl8_63K6d78kKS8Jm7IRmuS-ttrjfkJtAYWReSVZfRy2AM-bWXt");
-    settingsSheet.getRange("G3").setBackground("yellow");
-  }
-  
-  SpreadsheetApp.getUi().alert('Moon Sheets Setup Complete. Please verify the Moon Webhook in Settings!G3.');
-}
 
 /**
  * Fetches moon extractions and updates the MoonPull sheet.
@@ -67,7 +36,9 @@ function updateMoonExtractions() {
 
   try {
     // Pass language and character name for authentication
-    var extractions = GESI.corporations_corporation_mining_extractions("en", characterName);
+    var extractions = GESI.corporation_corporation_mining_extractions(characterName);
+    Logger.log(extractions)
+    
   } catch (e) {
     Logger.log("Error fetching extractions: " + e);
     return;
@@ -81,6 +52,7 @@ function updateMoonExtractions() {
   // GESI returns a 2D array where row 0 contains column headers
   // Find column indices from headers
   var headers = extractions[0];
+  Logger.log["headers: " + headers]
   var colStructureId = headers.indexOf("structure_id");
   var colMoonId = headers.indexOf("moon_id");
   var colExtractionStart = headers.indexOf("extraction_start_time");
@@ -96,10 +68,9 @@ function updateMoonExtractions() {
   // Start from row 1 to skip headers
   for (var i = 1; i < extractions.length; i++) {
     var ex = extractions[i];
-
     var structureId = ex[colStructureId];
+    Logger.log("structure_id: " + structureId)
     var moonId = ex[colMoonId];
-
     var structureName = structureCache[structureId];
     if (!structureName) {
       structureName = getStructureName(structureId, characterName);
@@ -124,7 +95,7 @@ function updateMoonExtractions() {
     // Avoid rate limits
     Utilities.sleep(100);
   }
-  
+
   if (outputData.length > 0) {
     moonPullSheet.getRange(2, 1, outputData.length, outputData[0].length).setValues(outputData);
   }
@@ -183,12 +154,12 @@ function reportMoonStatusToDiscord() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var moonPullSheet = ss.getSheetByName("MoonPull");
   var settingsSheet = ss.getSheetByName("Settings");
-  
+
   if (!moonPullSheet) return;
-  
+
   var data = moonPullSheet.getDataRange().getValues();
   if (data.length <= 1) return; // No data
-  
+
   var webhookUrl = settingsSheet.getRange("G3").getValue();
   if (!webhookUrl) {
     Logger.log("No Moon Webhook URL found in Settings!G3");
@@ -197,20 +168,21 @@ function reportMoonStatusToDiscord() {
 
   // Bot identity
   var customName = settingsSheet.getRange('G5').getValue();
+  Logger.log(customName)
   var customURL = settingsSheet.getRange('G8').getValue();
   var botName = customName ? customName : (getCorpName() + " Mining Bot");
   var logoUrl = customURL ? customURL : getCorpLogoUrl();
 
   var now = new Date();
   var upcomingExtractions = [];
-  
+
   // Skip header
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     var structureName = row[0];
     var moonName = row[1];
     var arrivalTimeStr = row[3]; // Chunk Arrival
-    
+
     var arrivalTime = new Date(arrivalTimeStr);
     var timeDiff = arrivalTime.getTime() - now.getTime();
     var hoursDiff = timeDiff / (1000 * 60 * 60);
@@ -218,14 +190,14 @@ function reportMoonStatusToDiscord() {
     var status = "";
 
     // Use wider time windows to avoid missing notifications if hourly trigger doesn't align perfectly
-    if (hoursDiff >= 23 && hoursDiff < 25) {
+    if (hoursDiff >= 24 && hoursDiff < 25) {
       status = "24h Warning";
     } else if (hoursDiff >= 0.5 && hoursDiff < 1.5) {
       status = "1h Warning";
     } else if (hoursDiff >= -0.5 && hoursDiff < 0.5) {
       status = "READY";
     }
-    
+
     if (status) {
       upcomingExtractions.push({
         structure: structureName,
@@ -236,52 +208,51 @@ function reportMoonStatusToDiscord() {
       });
     }
   }
-  
+
   if (upcomingExtractions.length > 0) {
     var embed = {
-      title: "Moon Extraction Updates",
+      title: "Moon Extraction Update",
       color: 16776960, // Yellow
       timestamp: now.toISOString(),
       author: { name: botName, icon_url: logoUrl },
       fields: []
     };
-    
+
     upcomingExtractions.forEach(function(ex) {
       var msg = "";
       if (ex.status === "READY") {
-        msg = "🔴 **EXTRACTION READY NOW**";
+        msg = "🟢 **EXTRACTION READY NOW**";
       } else if (ex.status === "1h Warning") {
         msg = "🟠 **Extraction in < 1 Hour**";
       } else if (ex.status === "24h Warning") {
-        msg = "🟡 **Extraction in 24 Hours**";
+        msg = "🟡 **Extraction coming up in 24 Hours**";
       }
-      
+
       embed.fields.push({
         name: ex.structure + " - " + ex.moon,
         value: msg + "\nArrival: " + ex.arrival.toUTCString()
       });
     });
-    
+
     sendToDiscord([embed], webhookUrl);
   }
-  
+
 
 }
 
 /**
  * Sends a daily summary of all pending extractions.
  * Should be triggered daily.
- */
-function reportDailyMoonSummary() {
+ */function reportDailyMoonSummary() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var moonPullSheet = ss.getSheetByName("MoonPull");
   var settingsSheet = ss.getSheetByName("Settings");
-  
+
   if (!moonPullSheet) return;
-  
+
   var data = moonPullSheet.getDataRange().getValues();
   if (data.length <= 1) return;
-  
+
   var webhookUrl = settingsSheet.getRange("G3").getValue();
   if (!webhookUrl) return;
 
@@ -291,44 +262,116 @@ function reportDailyMoonSummary() {
   var logoUrl = customURL ? customURL : getCorpLogoUrl();
 
   var now = new Date();
-  var extractions = [];
-  
+
+  // Start of "today"
+  var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Start of "yesterday"
+  var startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+  var upcoming = [];
+  var recent = [];
+
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     var arrivalTime = new Date(row[3]);
+    if (isNaN(arrivalTime)) continue; // skip bad data
+
     if (arrivalTime > now) {
-      extractions.push({
+      // Future extraction
+      upcoming.push({
+        structure: row[0],
+        moon: row[1],
+        arrival: arrivalTime
+      });
+    } else if (arrivalTime >= startOfYesterday) {
+      // Past extraction, but only today or yesterday
+      recent.push({
         structure: row[0],
         moon: row[1],
         arrival: arrivalTime
       });
     }
   }
-  
-  // Sort by arrival time
-  extractions.sort(function(a, b) { return a.arrival - b.arrival; });
-  
-  if (extractions.length > 0) {
-    var embed = {
-      title: "Daily Moon Extraction Summary",
-      description: "Upcoming extractions for the next few days.",
-      color: 3447003, // Blue
-      timestamp: now.toISOString(),
-      author: { name: botName, icon_url: logoUrl },
-      fields: []
-    };
-    
-    extractions.forEach(function(ex) {
-      var timeDiff = ex.arrival.getTime() - now.getTime();
-      var days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-      var hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      
-      embed.fields.push({
-        name: ex.structure + " - " + ex.moon,
-        value: "Arrives in: " + days + "d " + hours + "h\n(" + ex.arrival.toUTCString() + ")"
-      });
-    });
-    
-    sendToDiscord([embed], webhookUrl);
+
+  // Sort both buckets by time
+  upcoming.sort(function(a, b) { return a.arrival - b.arrival; });
+  recent.sort(function(a, b) { return a.arrival - b.arrival; });
+
+  // Only send a message if we have something to say
+  if (upcoming.length === 0 && recent.length === 0) {
+    return;
   }
+
+  var embed = {
+    title: "Daily Moon Extraction Summary",
+    description: "Recent and upcoming extractions.",
+    color: 3447003, // Blue
+    timestamp: now.toISOString(),
+    author: { name: botName, icon_url: logoUrl },
+    fields: []
+  };
+
+  var MS_PER_HOUR = 1000 * 60 * 60;
+  var MS_PER_DAY = MS_PER_HOUR * 24;
+
+  // 1) Recent extractions (today / yesterday)
+  if (recent.length > 0) {
+  // Section header
+  embed.fields.push({
+    name: "🟪 **Recent Extractions**",
+    value: "Completed today or yesterday.",
+    inline: false
+  });
+
+  recent.forEach(function(ex) {
+    embed.fields.push({
+      name: ex.structure + " - " + ex.moon,
+      value: "Completed: " + ex.arrival.toUTCString(),
+      inline: false
+    });
+  });
+
+  // Spacer before next section
+  embed.fields.push({
+    name: "\u200B",
+    value: " ",
+    inline: false
+  });
+}
+
+  // 2) Upcoming extractions
+  if (upcoming.length > 0) {
+  embed.fields.push({
+    name: "🟦 **Upcoming Extractions**",
+    value: "Scheduled in the next few days.",
+    inline: false
+  });
+
+  upcoming.forEach(function(ex) {
+    embed.fields.push({
+      name: ex.structure + " - " + ex.moon,
+      value: "Ready in: " + formatCountdown(ex.arrival, now),
+      inline: false
+    });
+  });
+}
+
+
+  sendToDiscord([embed], webhookUrl);
+
+}
+
+function formatCountdown(arrival, now) {
+  var ms = arrival.getTime() - now.getTime();
+  var days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  var hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+  if (days === 0) return hours + " hours\n(" + arrival.toUTCString() + ")";
+  return days + " days " + hours + " hours\n(" + arrival.toUTCString() + ")";
+}
+
+//a quick hack to call and see if the page is here 
+function checkMoonTrackerScriptExits() {
+  return true
 }

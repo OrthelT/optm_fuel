@@ -12,17 +12,18 @@
  * 
  * The script uses time-based triggers to run these functions at specified intervals.
  */
+var ui = SpreadsheetApp.getUi()
 
 // This function is triggered when the Google Sheets document is opened
 function onOpen() {
     var ui = SpreadsheetApp.getUi();
   
     // Create a custom menu in the spreadsheet named 'Fuel stuff'
-    ui.createMenu('Fuel stuff')
+    ui.createMenu('Fuel Status')
       // Add an item to the custom menu. When this item is clicked, it will trigger the 'updateStationFuel' function
-      .addItem('Update Station Fuel', 'updateStationFuel')
+      .addItem('Update Fuel Status', 'updateFuel')
       // Add an item to the custom menu. When this item is clicked, it will trigger the 'reportStatusToDiscord' function
-      .addItem('Report Status to Discord', 'reportStatusToDiscord')
+      .addItem('Report Status to Discord', 'reportFuelStatusToDiscord')
       // Add an item to clear cell D1 on the "CleanData" sheet
       .addItem('Clear Time', 'clearCellS2')
       // Add an item to get the UTC timestamp and output it to cell D1 on the "CleanData" sheet
@@ -30,17 +31,15 @@ function onOpen() {
       .addToUi();
 
     // Create a custom menu for Moon Extraction
-    ui.createMenu('Moon Stuff')
+    ui.createMenu('Moon Status')
       .addItem('Update Moon Extractions', 'updateMoonExtractions')
-      .addItem('Report Moon Status (Hourly)', 'reportMoonStatusToDiscord')
-      .addItem('Report Daily Summary', 'reportDailyMoonSummary')
-      .addItem('Setup Moon Sheets', 'setupMoonSheets')
+      .addItem('Report Moon Status', 'reportDailyMoonSummary')
       .addToUi();
   
     // Create a separate menu for the setup function
     ui.createMenu('Setup')
       // Add an item to get Setup the sheet for a new user
-      .addItem('Setup', 'setupSheetsForNewUser')
+      .addItem('Setup Fuel and Moon Sheets', 'setupSheetsForNewUser')
       // Add the setup menu to the user interface
       .addToUi();
   }
@@ -61,17 +60,64 @@ function onOpen() {
     return logoUrl
   }
 
+  function check_GESI() {
+    try{
+      var authCharacters = GESI.getAuthenticatedCharacterNames();
+    } catch(err) {
+      ui.alert("Error" + err + "did your forget to set up GESI?");
+      return false;
+    }
+    try {
+    var num_chars = authCharacters.length;
+    Logger.log("Found " + num_chars + "character(s): " + authCharacters);
+    } catch {
+      Logger.log("No authenticated characters found.");
+      ui.alert("No authenticated characters found. Go to Extensions -> GESI -> Authorize Character to fix.");
+      return false;
+    }
+
+    if (num_chars>0) {
+      Logger.log(authCharacters);
+      Logger.log("authCharacters: " + authCharacters.length);
+      return true;
+
+    } else {
+      return false;
+    }
+  }
+
   function GetCharInfo() {
     //Gets info about the main character listed at Settings cell A2 and returns a dictionary of information.
 
     // Get the stored ID of the spreadsheet
+    
     var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
     // Get the spreadsheet by its ID
     var ss = SpreadsheetApp.openById(spreadsheetId);
     var settingsSheet = ss.getSheetByName("Settings");
     var mainchar = settingsSheet.getRange("A2").getValue();
-    var charinfo = GESI.getCharacterData(mainchar);
-    Logger.log("data: %s",charinfo)
+    Logger.log("Main Char Set from Settings sheet as " + mainchar);
+
+    if (mainchar == "") {
+      Logger.log("Main Char missing from settings sheet. Trying to set from ESI_List instead")
+      var ESI_List = ss.getSheetByName("ESI_List");
+      var altMainChar =ESI_List.getRange("A2").getValue();
+      if (altMainChar != "") {
+        mainchar = altMainChar
+      
+      ui.alert("Using alternate settings from ESI_list: " + mainchar + "Please set mainchar in Settings Sheet")
+      } else if (altMainChar == "") {
+          ui.alert("Missing main character information. Please go to Settings Sheet to set it.")
+          return
+        }
+      
+    }
+    try {
+        var charinfo = GESI.getCharacterData(mainchar);
+        Logger.log("data: %s",charinfo)
+    } catch (err) {
+      Logger.log("error: " + err)
+    }
 
     return charinfo
   }
@@ -110,8 +156,8 @@ function onOpen() {
     return utcDate.toISOString();
   }
   
-// This function updates the station's fuel.
-function updateStationFuel() {
+// This function updates the structures's fuel.
+function updateFuel() {
 
     //clear and reset the timestamp
     clearCellS2()
@@ -122,21 +168,21 @@ function updateStationFuel() {
     // Get the spreadsheet by its ID
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     var settingsSheet = spreadsheet.getSheetByName("Settings");
-    var pullSheet = spreadsheet.getSheetByName("Pull");
+    var fuelPullSheet = spreadsheet.getSheetByName("FuelPull");
 
-    // If the 'Pull' sheet does not exist, create it.
-    if (!pullSheet) {
-      pullSheet = spreadsheet.insertSheet("Pull");
+    // If the 'FuelPull' sheet does not exist, create it.
+    if (!fuelPullSheet) {
+      fuelPullSheet = spreadsheet.insertSheet("FuelPull");
     }
 
-    // Clear the 'Pull' sheet.
-    pullSheet.clear();
+    // Clear the 'FuelPull' sheet.
+    fuelPullSheet.clear();
 
     // Get the names from the 'Settings' sheet.
     var names = settingsSheet.getRange("A2:A").getValues();
   
-    // Initialize the row counter for the 'Pull' sheet.
-    var pullSheetRow = 3;
+    // Initialize the row counter for the 'FuelPull' sheet.
+    var fuelPullSheetRow = 3;
   
     // Loop through the names.
     for (var i = 0; i < names.length; i++) {
@@ -144,11 +190,11 @@ function updateStationFuel() {
         // Call the 'corporations_corporation_structures' function with the current name.
         var result = GESI.corporations_corporation_structures("en", names[i][0]);
 
-        // If the 'result' array is not empty, populate the 'Pull' sheet with the data.
+        // If the 'result' array is not empty, populate the 'FuelPull' sheet with the data.
 
         if (Array.isArray(result) && result.length > 0) {
-          pullSheet.getRange(pullSheetRow, 1, result.length, result[0].length).setValues(result);
-          pullSheetRow += result.length + 5;  // Skip 5 rows after each output.
+          fuelPullSheet.getRange(fuelPullSheetRow, 1, result.length, result[0].length).setValues(result);
+          fuelPullSheetRow += result.length + 5;  // Skip 5 rows after each output.
         }
 
         // Wait for 5 seconds before moving to the next name.
@@ -171,7 +217,7 @@ function updateStationFuel() {
   }
   
   // This function reports the status to Discord
-  function reportStatusToDiscord() {
+  function reportFuelStatusToDiscord() {
     //clear and reset the timestamp
     getUtcTimestampToS2()
     
@@ -347,12 +393,63 @@ function updateStationFuel() {
     // Store the ID of the active spreadsheet
     PropertiesService.getScriptProperties().setProperty('spreadsheetId', ss.getId());
   
-    // Check if the "Pull" sheet exists, if not, create it
-    var pullSheet = ss.getSheetByName("Pull");
-    if (!pullSheet) {
-      pullSheet = ss.insertSheet("Pull");
+    // Check if the "FuelPull" sheet exists, if not, create it
+    var fuelPullSheet = ss.getSheetByName("FuelPull");
+    if (!fuelPullSheet) {
+      fuelPullSheet = ss.insertSheet("FuelPull");
+    }
+
+    var moonPullSheet = ss.getSheetByName("MoonPull");
+    if (!moonPullSheet) {
+    moonPullSheet = ss.insertSheet("MoonPull");
+    moonPullSheet.getRange("A1:F1").setValues([["Structure Name", "Moon Name", "Extraction Start", "Chunk Arrival", "Natural Decay", "Structure ID"]]);
+    moonPullSheet.getRange("A1:F1").setFontWeight("bold");
+  }
+
+    // Check if the "CleanData" sheet exists, if not, create it
+    var cleanDataSheet = ss.getSheetByName("CleanData");
+    if (!cleanDataSheet) {
+      cleanDataSheet = ss.insertSheet("CleanData");
+      // Set formulas for the "CleanData" sheet
+      cleanDataSheet.getRange("C1").setFormula('=IFERROR(SPLIT(CleanData!$D$1, "Z"),now())');
+      cleanDataSheet.getRange("A2").setFormula('=UNIQUE(FuelPull!C:C)');
+      cleanDataSheet.getRange("B3").setValue('Days Remaining');
+      for (var i = 4; i <= 104; i++) {
+        cleanDataSheet.getRange("B" + i).setFormula('=IF(C' + i + '="","",TEXT(INT((C' + i + '-$C$1)), "0") & " days " & TEXT(MOD((C' + i + '-$C$1), 1), "h") & " hours")');
+        cleanDataSheet.getRange("C" + i).setFormula('=IFERROR(IF(A' + i + '="","", LEFT(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!B:B),LEN(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!B:B))-1)-0))');
+        cleanDataSheet.getRange("D" + i).setFormula('=IFERROR(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!I:I))');
+      }
+      // Format column C as Date Time
+      cleanDataSheet.getRange("C1:C104").setNumberFormat('yyyy-mm-dd hh:mm:ss');
     }
   
+   // Check if the "Instructions" sheet exists, if not, create it
+   var instructionsSheet = ss.getSheetByName("Instructions");
+   
+   if (!instructionsSheet) {
+     instructionsSheet = ss.insertSheet("Instructions");
+     var heading_style = SpreadsheetApp.newTextStyle().setFontSize(18).setBold(true).build();
+     // Write the instructions to the "Instructions" sheet
+
+     instructionsSheet.getRange("A1").setValue("Instructions for setting up the script:").setTextStyle(heading_style)
+     instructionsSheet.getRange("A3").setValue("1. Enter the EVE character name in cell A2 of the 'Settings' sheet.");
+     instructionsSheet.getRange("A4").setValue("2. Enter the Discord webhook URL in cell G2 of the 'Settings' sheet.");
+     instructionsSheet.getRange("A5").setValue("3. Make sure GESI is setup from https://blacksmoke16.github.io/GESI/");
+     instructionsSheet.getRange("A6").setValue("4. Open the App Script editor by clicking on 'Extensions' > 'Apps Script'.");
+     instructionsSheet.getRange("A7").setValue("5. Click on the clock icon, which represents 'Triggers' in the left sidebar.");
+     instructionsSheet.getRange("A8").setValue("6. Click on '+ Add Trigger' in the lower right corner.");
+     instructionsSheet.getRange("A9").setValue("7. Choose the 'getUtcTimestampToS2' function.");
+     instructionsSheet.getRange("A10").setValue("8. Choose the deployment from the dropdown.");
+     instructionsSheet.getRange("A11").setValue("9. Under 'Select event source', choose 'Time-driven'.");
+     instructionsSheet.getRange("A12").setValue("10. Configure the frequency of the trigger to 'Every 6 hours'.");
+     instructionsSheet.getRange("A13").setValue("11. Click 'Save'.");
+     instructionsSheet.getRange("A14").setValue("12. Repeat steps 6-11 for the 'updateFuel' function, but set the frequency to 'Day timer' set time of day.");
+     instructionsSheet.getRange("A15").setValue("13. Repeat steps 6-11 for the 'reportStatusToDiscord' function, but set the frequency to 'Day Timer' and an hour later then updateStationFuel.");
+     instructionsSheet.getRange("A20").setValue("NOTE: If you see a GESI undefined error, you probably need to enable the GESI Script library in Extensions->AppScripts->Libraries mentioned in Step 3.");
+     instructionsSheet.getRange("A22").setValue("When you first run this, Google will warn you that this app has not been approved by Google -- which is true. You will need to go to 'Advanced' to enable it.");
+     instructionsSheet.getRange("A23").setValue("You can set custom values for the name and logo of your app in Settings. (optional)")
+   }
+
     // Check if the "Settings" sheet exists, if not, create it
     var settingsSheet = ss.getSheetByName("Settings");
     if (!settingsSheet) {
@@ -360,6 +457,7 @@ function updateStationFuel() {
       // Set headers for the "Settings" sheet
       settingsSheet.getRange("A1").setValue("Name(s)");
       settingsSheet.getRange("G1").setValue("discordWebHook");
+      settingsSheet.getRange("F2").setValue("Fuel Webhook");
       settingsSheet.getRange("G4").setValue("Custom Bot Name (optional)");
       settingsSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
       settingsSheet.getRange("G7").setValue("Logo URL (optional)");
@@ -369,49 +467,23 @@ function updateStationFuel() {
       var valueCells = settingsSheet.getRangeList(['A2','G2','G5','G8'])
       valueCells.setBackground('yellow')
     }
-  
-    // Check if the "CleanData" sheet exists, if not, create it
-    var cleanDataSheet = ss.getSheetByName("CleanData");
-    if (!cleanDataSheet) {
-      cleanDataSheet = ss.insertSheet("CleanData");
-      // Set formulas for the "CleanData" sheet
-      cleanDataSheet.getRange("C1").setFormula('=IFERROR(SPLIT(CleanData!$D$1, "Z"),now())');
-      cleanDataSheet.getRange("A2").setFormula('=UNIQUE(Pull!C:C)');
-      cleanDataSheet.getRange("B3").setValue('Days Remaining');
-      for (var i = 4; i <= 104; i++) {
-        cleanDataSheet.getRange("B" + i).setFormula('=IF(C' + i + '="","",TEXT(INT((C' + i + '-$C$1)), "0") & " days " & TEXT(MOD((C' + i + '-$C$1), 1), "h") & " hours")');
-        cleanDataSheet.getRange("C" + i).setFormula('=IFERROR(IF(A' + i + '="","", LEFT(XLOOKUP($A' + i + ',Pull!$C:$C,Pull!B:B),LEN(XLOOKUP($A' + i + ',Pull!$C:$C,Pull!B:B))-1)-0))');
-        cleanDataSheet.getRange("D" + i).setFormula('=IFERROR(XLOOKUP($A' + i + ',Pull!$C:$C,Pull!I:I))');
-      }
-      // Format column C as Date Time
-      cleanDataSheet.getRange("C1:C104").setNumberFormat('yyyy-mm-dd hh:mm:ss');
+    //setup moon sheets (code is in moon_tracker.gs)
+    var ui = SpreadsheetApp.getUi();
+
+    try {
+    moonScript = checkMoonTrackerScriptExits();
+    } catch (err) {
+      ui.alert('Moon sheets not set up. Did you forget to copy moon-tracker.gs to AppScripts?');
     }
-  
-   // Check if the "Instructions" sheet exists, if not, create it
-   var instructionsSheet = ss.getSheetByName("Instructions");
-   if (!instructionsSheet) {
-     instructionsSheet = ss.insertSheet("Instructions");
-     // Write the instructions to the "Instructions" sheet
-     instructionsSheet.getRange("A1").setValue("Instructions for setting up the script:");
-     instructionsSheet.getRange("A2").setValue("1. Enter the EVE character name in cell A2 of the 'Settings' sheet.");
-     instructionsSheet.getRange("A3").setValue("2. Enter the Discord webhook URL in cell G2 of the 'Settings' sheet.");
-     instructionsSheet.getRange("A4").setValue("3. Make sure GESI is setup from https://blacksmoke16.github.io/GESI/");
-     instructionsSheet.getRange("A5").setValue("4. Open the App Script editor by clicking on 'Extensions' > 'Apps Script'.");
-     instructionsSheet.getRange("A6").setValue("5. Click on the clock icon, which represents 'Triggers' in the left sidebar.");
-     instructionsSheet.getRange("A7").setValue("6. Click on '+ Add Trigger' in the lower right corner.");
-     instructionsSheet.getRange("A8").setValue("7. Choose the 'getUtcTimestampToS2' function.");
-     instructionsSheet.getRange("A9").setValue("8. Choose the deployment from the dropdown.");
-     instructionsSheet.getRange("A10").setValue("9. Under 'Select event source', choose 'Time-driven'.");
-     instructionsSheet.getRange("A11").setValue("10. Configure the frequency of the trigger to 'Every 6 hours'.");
-     instructionsSheet.getRange("A12").setValue("11. Click 'Save'.");
-     instructionsSheet.getRange("A13").setValue("12. Repeat steps 6-11 for the 'updateStationFuel' function, but set the frequency to 'Day timer' set time of day.");
-     instructionsSheet.getRange("A14").setValue("13. Repeat steps 6-11 for the 'reportStatusToDiscord' function, but set the frequency to 'Day Timer' and an hour later then updateStationFuel.");
-     instructionsSheet.getRange("A16").setValue("NOTE: If you see a GESI undefined error, you probably need to enable the GESI Script library in Extensions->AppScripts->Libraries mentioned in Step 3.");
-     instructionsSheet.getRange("A18").setValue("When you first run this, Google will warn you that this app has not been approved by Google -- which is true. You will need to go to 'Advanced' to enable it.");
-     instructionsSheet.getRange("A20").setValue("You can set custom values for the name and logo of your app in Settings. (optional)")
-   }
- 
-   // Display a dependency prompt
-   var ui = SpreadsheetApp.getUi();
-   ui.alert('Setup complete. If you have not already done so, please setup GESI from https://blacksmoke16.github.io/GESI/');
+    //prompt user for incomplete setup and next steps to configure
+    if (moonScript === true) {
+      var status_msg = "Setup complete. Please go to the setting sheet to configure the app. If you have not already done so, please setup GESI from https://blacksmoke16.github.io/GESI/'"
+    } else {
+      var status_msg = "Setup incomplete. Moon sheets were not created. Copy moon-tracker.gs into AppScrips and run setup again. Then go to the setting sheet to configure the app. If you have not already done so, please setup GESI from https://blacksmoke16.github.io/GESI/'."
+    }
+
+   ui.alert(status_msg);
+
+    // 👉 Jump user to Settings sheet
+    ss.setActiveSheet(settingsSheet); 
  }

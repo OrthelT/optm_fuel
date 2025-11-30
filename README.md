@@ -8,6 +8,7 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 - Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
 - Automatic updates - set it once and forget it
 <img width="333" height="532" alt="image" src="https://github.com/user-attachments/assets/0f94ac8b-4dc4-4788-be3c-c008b761e7c6" />
+
 ### Moon Bot
 - Daily summary of all moon extractions
 - Advance warnings: 24 hours before and 1 hour before extraction ready time

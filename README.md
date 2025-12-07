@@ -33,6 +33,7 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 - Join my Discord for questions or suggestions: [Orthel's Lab](https://discord.gg/5FdUr9KRde)
 
 ## Setup (10-15 minutes)
+*Note: Some locales have different syntax. If you encounter errors, switch locale to US.*
 
 ### Step 1: Create Your Google Sheet
 

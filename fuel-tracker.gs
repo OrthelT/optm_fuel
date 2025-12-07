@@ -441,8 +441,8 @@ function updateFuelStatus() {
       cleanDataSheet.getRange("B3").setValue('Days Remaining');
       for (var i = 4; i <= 104; i++) {
         cleanDataSheet.getRange("B" + i).setFormula('=IF(C' + i + '="","",TEXT(INT((C' + i + '-$C$1)), "0") & " days " & TEXT(MOD((C' + i + '-$C$1), 1), "h") & " hours")');
-        cleanDataSheet.getRange("C" + i).setFormula('=IFERROR(IF(A' + i + '="","", LEFT(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!B:B),LEN(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!B:B))-1)-0))');
-        cleanDataSheet.getRange("D" + i).setFormula('=IFERROR(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!I:I))');
+        cleanDataSheet.getRange("C" + i).setFormula('=IFERROR(IF(A' + i + '="","", LEFT(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!B:B),LEN(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!B:B))-1)-0),"")');
+        cleanDataSheet.getRange("D" + i).setFormula('=IFERROR(XLOOKUP($A' + i + ',FuelPull!$C:$C,FuelPull!I:I,""),"")');
       }
       // Format column C as Date Time
       cleanDataSheet.getRange("C1:C104").setNumberFormat('yyyy-mm-dd hh:mm:ss');
@@ -474,6 +474,7 @@ function updateFuelStatus() {
      
 
      instructionsSheet.getRange("A20").setValue("NOTE: If you see a GESI undefined error, you probably need to enable the GESI Script library in Extensions->AppScripts->Libraries mentioned in Step 3.");
+     instructionsSheet.getRange("A21").setValue("NOTE: Some locales use different syntax, which will cause formulas to work incorrectly. If you encounter errors, try changing your locale to US.")
      instructionsSheet.getRange("A22").setValue("When you first run this, Google will warn you that this app has not been approved by Google -- which is true. You will need to go to 'Advanced' to enable it.");
      instructionsSheet.getRange("A23").setValue("You can set custom values for the name and logo of your app in Settings. (optional)")
      instructionsSheet.getRange("A25").setValue("For more detailed instructions go to https://github.com/OrthelT/optm_fuel/blob/main/README.md")

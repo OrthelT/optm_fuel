@@ -284,6 +284,20 @@ function updateFuelStatus() {
       logoUrl = getCorpLogoUrl()
     }
 
+    // role pings
+    var pingWarning = settingsSheet.getRange('G13').getValue();
+    var pingCritical = settingsSheet.getRange('G14').getValue();
+    if (pingWarning) {
+      var pingW = "<@&" + pingWarning + ">\n ";
+    } else {
+      var pingW = "";
+    }
+    if (pingCritical) {
+      var pingC = "<@&" + pingCritical + ">\n ";
+    } else {
+      var pingC = "";
+    }
+
     //Slice the array from index 3:end and then sort it A-Z
     var dataStnsOnly = data.slice(3).sort(sortFunction);
 
@@ -351,7 +365,7 @@ function updateFuelStatus() {
     if (criticalStructures.length > 0) {
       var criticalEmbed = {
         title: "🔴 CRITICAL - Immediate Action Required",
-        description: "",
+        description: pingC + "",
         color: 15158332 // Red color
       };
       
@@ -367,7 +381,7 @@ function updateFuelStatus() {
     if (warningStructures.length > 0) {
       var warningEmbed = {
         title: "🟠 WARNING - Action Needed Soon",
-        description: "",
+        description: pingW + "",
         color: 16763904 // Orange color
       };
       
@@ -708,11 +722,14 @@ function updateFuelStatus() {
       settingsSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
       settingsSheet.getRange("G7").setValue("Logo URL (optional)");
       settingsSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
+      settingsSheet.getRange("G12").setValue("Fuel Role pings (optional)");
+      settingsSheet.getRange("H13").setValue("<-- Warning");
+      settingsSheet.getRange("H14").setValue("<-- Critical");
       settingsSheet.getRange("F10").setValue("Enable Chunking");
       settingsSheet.getRange("H10").setValue("<-- Set to 'Yes' to split large reports into multiple messages (for 50+ structures)")
 
       // Define a range of cells where values should be entered so we can format them differently
-      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8','G10'])
+      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8','G10','G13','G14'])
       valueCells.setBackground('yellow')
     }
     //setup moon sheets (code is in moon_tracker.gs)

@@ -459,12 +459,12 @@ function updateFuelStatus() {
 
   /**
    * Reports fuel status to Discord with chunking support for large structure lists.
-   * This function splits large messages into smaller chunks to avoid Discord's size limits.
-   * Configure chunking by setting 'Yes' in Settings cell G10.
+   * This function always splits messages into smaller chunks to avoid Discord's size limits.
+   * Use this function instead of reportFuelStatusToDiscord when you have 50+ structures.
    */
   function reportFuelStatusToDiscordChunked() {
     // Maximum characters per embed description (safe margin under Discord's 4096 limit)
-    var MAX_DESCRIPTION_LENGTH = 3500;
+    var MAX_DESCRIPTION_LENGTH = 3000;
 
     // Update timestamp
     getUtcTimestampToS2();
@@ -473,15 +473,7 @@ function updateFuelStatus() {
     var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
     var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
 
-    // Check if chunking is enabled in Settings G10
     var settingsSheet = spreadsheet.getSheetByName("Settings");
-    var chunkingEnabled = settingsSheet.getRange("G10").getValue();
-
-    // If chunking is not enabled, fall back to original function
-    if (!chunkingEnabled || chunkingEnabled.toString().toLowerCase() !== "yes") {
-      reportFuelStatusToDiscord();
-      return;
-    }
 
     // Get the Discord webhook URL from cell G2 of the "Settings" sheet
     var discordWebhookUrl = settingsSheet.getRange("G2").getValue();

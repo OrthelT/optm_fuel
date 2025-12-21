@@ -24,6 +24,8 @@ function onOpen() {
       .addItem('Update Fuel Status', 'updateFuelStatus')
       // Add an item to the custom menu. When this item is clicked, it will trigger the 'reportStatusToDiscord' function
       .addItem('Report Fuel Status to Discord', 'reportFuelStatusToDiscord')
+      // Add an item for chunked reporting (for large structure lists)
+      .addItem('Report Fuel Status to Discord (Chunked)', 'reportFuelStatusToDiscordChunked')
       // Add an item to clear cell D1 on the "CleanData" sheet
       .addItem('Clear Time', 'clearCellS2')
       // Add an item to get the UTC timestamp and output it to cell D1 on the "CleanData" sheet
@@ -405,11 +407,220 @@ function updateFuelStatus() {
       contentType: "application/json",
       payload: JSON.stringify({ embeds: embeds }),
     };
-  
+
     // Send the HTTP request to the Discord webhook URL
     UrlFetchApp.fetch(webhookUrl, payload);
   }
-  
+
+  /**
+   * Splits an array of structures into chunks that fit within Discord's embed description limit.
+   * @param {Array} structures - Array of structure objects
+   * @param {number} maxChars - Maximum characters per chunk (default 3500, safe margin under 4096)
+   * @param {Function} formatFn - Function to format each structure entry into a string
+   * @returns {Array} Array of description strings, each under maxChars
+   */
+  function chunkStructures(structures, maxChars, formatFn) {
+    var chunks = [];
+    var currentChunk = "";
+
+    for (var i = 0; i < structures.length; i++) {
+      var entry = formatFn(structures[i]);
+
+      // If adding this entry would exceed the limit, save current chunk and start new one
+      if (currentChunk.length + entry.length > maxChars && currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = "";
+      }
+
+      currentChunk += entry;
+    }
+
+    // Don't forget the last chunk
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Sends multiple Discord messages sequentially with delays to avoid rate limiting.
+   * @param {Array} messages - Array of embed arrays, each will be sent as a separate message
+   * @param {string} webhookUrl - Discord webhook URL
+   */
+  function sendToDiscordChunked(messages, webhookUrl) {
+    for (var i = 0; i < messages.length; i++) {
+      sendToDiscord(messages[i], webhookUrl);
+
+      // Wait 1 second between messages to respect Discord rate limits
+      if (i < messages.length - 1) {
+        Utilities.sleep(1000);
+      }
+    }
+  }
+
+  /**
+   * Reports fuel status to Discord with chunking support for large structure lists.
+   * This function always splits messages into smaller chunks to avoid Discord's size limits.
+   * Use this function instead of reportFuelStatusToDiscord when you have 50+ structures.
+   */
+  function reportFuelStatusToDiscordChunked() {
+    // Maximum characters per embed description (safe margin under Discord's 4096 limit)
+    var MAX_DESCRIPTION_LENGTH = 3000;
+
+    // Update timestamp
+    getUtcTimestampToS2();
+
+    // Get the stored ID of the spreadsheet
+    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+
+    var settingsSheet = spreadsheet.getSheetByName("Settings");
+
+    // Get the Discord webhook URL from cell G2 of the "Settings" sheet
+    var discordWebhookUrl = settingsSheet.getRange("G2").getValue();
+
+    if (!verify_pulldata(spreadsheet)) {
+      updateFuelStatus();
+    }
+
+    // Get data from CleanData sheet
+    var sheet = spreadsheet.getSheetByName("CleanData");
+    var data = sheet.getDataRange().getValues();
+
+    // Get bot name and logo settings
+    var customName = settingsSheet.getRange('G5').getValue();
+    var customURL = settingsSheet.getRange('G8').getValue();
+
+    var botName = customName ? customName : getCorpName() + " Fuel Bot";
+    var logoUrl = customURL ? customURL : getCorpLogoUrl();
+
+    // Slice the array from index 3:end and sort A-Z
+    var dataStnsOnly = data.slice(3).sort(sortFunction);
+
+    // Create arrays for different urgency levels
+    var criticalStructures = [];
+    var warningStructures = [];
+    var healthyStructures = [];
+
+    // Sort structures by fuel status
+    for (var i = 0; i < dataStnsOnly.length; i++) {
+      var stationName = dataStnsOnly[i][0];
+
+      if (!stationName) continue;
+
+      var daysHours = dataStnsOnly[i][1].split(' ');
+      var daysremain = parseInt(daysHours[0]);
+      var hoursremain = parseInt(daysHours[2]);
+
+      var futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + daysremain);
+      futureDate.setHours(futureDate.getHours() + hoursremain);
+      var futureTimestamp = Math.floor(futureDate.getTime() / 1000);
+
+      var structureInfo = {
+        name: stationName,
+        days: daysremain,
+        hours: hoursremain,
+        timestamp: futureTimestamp,
+        state: dataStnsOnly[i][3]
+      };
+
+      if (daysremain < 3) {
+        criticalStructures.push(structureInfo);
+      } else if (daysremain < 7) {
+        warningStructures.push(structureInfo);
+      } else {
+        healthyStructures.push(structureInfo);
+      }
+    }
+
+    // Format functions for each category
+    var formatCriticalWarning = function(structure) {
+      return "**" + structure.name + "** -- " + structure.days + " days " + structure.hours + " hours remaining\n";
+    };
+
+    var formatHealthy = function(structure) {
+      return "**" + structure.name + "** -- " + structure.days + " days\n";
+    };
+
+    // Build messages array - each element is an array of embeds to send as one message
+    var messages = [];
+
+    // First message: Header embed
+    var headerEmbed = {
+      title: "Fuel Status Update",
+      description: "",
+      color: 3447003,
+      timestamp: new Date().toISOString(),
+      author: {
+        name: botName,
+        icon_url: logoUrl
+      },
+      footer: {
+        text: "EVE Online Structure Tracker"
+      }
+    };
+    messages.push([headerEmbed]);
+
+    // Process critical structures
+    if (criticalStructures.length > 0) {
+      var criticalChunks = chunkStructures(criticalStructures, MAX_DESCRIPTION_LENGTH, formatCriticalWarning);
+
+      for (var c = 0; c < criticalChunks.length; c++) {
+        var title = "🔴 CRITICAL - Immediate Action Required";
+        if (criticalChunks.length > 1) {
+          title += " (" + (c + 1) + "/" + criticalChunks.length + ")";
+        }
+
+        messages.push([{
+          title: title,
+          description: criticalChunks[c],
+          color: 15158332
+        }]);
+      }
+    }
+
+    // Process warning structures
+    if (warningStructures.length > 0) {
+      var warningChunks = chunkStructures(warningStructures, MAX_DESCRIPTION_LENGTH, formatCriticalWarning);
+
+      for (var w = 0; w < warningChunks.length; w++) {
+        var title = "🟠 WARNING - Action Needed Soon";
+        if (warningChunks.length > 1) {
+          title += " (" + (w + 1) + "/" + warningChunks.length + ")";
+        }
+
+        messages.push([{
+          title: title,
+          description: warningChunks[w],
+          color: 16763904
+        }]);
+      }
+    }
+
+    // Process healthy structures
+    if (healthyStructures.length > 0) {
+      var healthyChunks = chunkStructures(healthyStructures, MAX_DESCRIPTION_LENGTH, formatHealthy);
+
+      for (var h = 0; h < healthyChunks.length; h++) {
+        var title = "🟢 HEALTHY - No Immediate Action Required";
+        if (healthyChunks.length > 1) {
+          title += " (" + (h + 1) + "/" + healthyChunks.length + ")";
+        }
+
+        messages.push([{
+          title: title,
+          description: healthyChunks[h],
+          color: 3066993
+        }]);
+      }
+    }
+
+    // Send all messages with delays between them
+    sendToDiscordChunked(messages, discordWebhookUrl);
+  }
+
   // This function sets up the sheets for a new user
   function setupSheetsForNewUser() {
     // Get the active Google Sheets document
@@ -496,9 +707,11 @@ function updateFuelStatus() {
       settingsSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
       settingsSheet.getRange("G7").setValue("Logo URL (optional)");
       settingsSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
+      settingsSheet.getRange("F10").setValue("Enable Chunking");
+      settingsSheet.getRange("H10").setValue("<-- Set to 'Yes' to split large reports into multiple messages (for 50+ structures)")
 
       // Define a range of cells where values should be entered so we can format them differently
-      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8'])
+      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8','G10'])
       valueCells.setBackground('yellow')
     }
     //setup moon sheets (code is in moon_tracker.gs)

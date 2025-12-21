@@ -69,6 +69,8 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
 - `G5`: Custom bot name (optional, defaults to "[Corp Name] Fuel Bot" or "[Corp Name] Mining Bot")
 - `G7`: "Logo URL (optional)" (label)
 - `G8`: Custom logo URL (optional, defaults to corp logo)
+- `G13`: Fuel Warning role ping id
+- `G14`: Fuel Critical role ping id
 
 **FuelPull Sheet:**
 - Raw data from `GESI.corporations_corporation_structures()`

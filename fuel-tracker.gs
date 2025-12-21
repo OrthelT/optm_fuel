@@ -24,6 +24,8 @@ function onOpen() {
       .addItem('Update Fuel Status', 'updateFuelStatus')
       // Add an item to the custom menu. When this item is clicked, it will trigger the 'reportStatusToDiscord' function
       .addItem('Report Fuel Status to Discord', 'reportFuelStatusToDiscord')
+      // Add an item for chunked reporting (for large structure lists)
+      .addItem('Report Fuel Status to Discord (Chunked)', 'reportFuelStatusToDiscordChunked')
       // Add an item to clear cell D1 on the "CleanData" sheet
       .addItem('Clear Time', 'clearCellS2')
       // Add an item to get the UTC timestamp and output it to cell D1 on the "CleanData" sheet

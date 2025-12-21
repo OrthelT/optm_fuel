@@ -41,6 +41,7 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
 **Fuel Bot Menu:**
 - "Update Fuel Status" → `updateFuelStatus()`
 - "Report Fuel Status to Discord" → `reportFuelStatusToDiscord()`
+- "Report Fuel Status to Discord (Chunked)" → `reportFuelStatusToDiscordChunked()`
 - "Clear Time" → `clearCellS2()`
 - "Get Time" → `getUtcTimestampToS2()`
 
@@ -182,6 +183,34 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
     ]
   }
   ```
+
+#### `reportFuelStatusToDiscordChunked()`
+- **Trigger**: Daily (1 hour after updateFuelStatus) OR manual via menu
+- **Purpose**: Sends Discord notification with fuel status, splitting large lists into multiple messages
+- **Use Case**: For corporations with 50+ structures that exceed Discord's 4096 character embed limit
+- **Process**:
+  1. Updates timestamp
+  2. Reads data from CleanData sheet
+  3. Categorizes structures (Critical/Warning/Healthy)
+  4. Chunks each category into segments under 3000 characters
+  5. Sends each chunk as a separate message with 1-second delays
+- **Chunk Titles**: When split, titles show "(1/3)", "(2/3)", etc.
+- **Bot Identity**: Uses custom name/logo from Settings G5/G8 or defaults to corp name/logo
+
+#### `chunkStructures(structures, maxChars, formatFn)`
+- **Purpose**: Helper function that splits structure arrays into chunks under character limit
+- **Parameters**:
+  - `structures`: Array of structure objects
+  - `maxChars`: Maximum characters per chunk (default 3000)
+  - `formatFn`: Function to format each structure entry
+- **Returns**: Array of description strings, each under maxChars
+
+#### `sendToDiscordChunked(messages, webhookUrl)`
+- **Purpose**: Sends multiple Discord messages sequentially with delays
+- **Parameters**:
+  - `messages`: Array of embed arrays, each sent as a separate message
+  - `webhookUrl`: Discord webhook URL
+- **Rate Limiting**: 1-second delay between messages
 
 #### `getUtcTimestampToS2()`
 - **Trigger**: Every 6 hours OR manual via menu
@@ -530,6 +559,13 @@ Users must create these triggers in Apps Script (clock icon):
 - Check: Timestamp in CleanData D1 is current?
 - Debug: Run reportFuelStatusToDiscord manually and check logs
 
+**Discord error 400 with large structure lists**
+- Cause: Discord embed description exceeds 4096 character limit
+- Symptom: Error message like "Request failed for https://discord.com/ returned code 400"
+- Solution: Use `reportFuelStatusToDiscordChunked()` instead of `reportFuelStatusToDiscord()`
+- Menu: Fuel Bot → Report Fuel Status to Discord (Chunked)
+- For triggers: Update trigger to use `reportFuelStatusToDiscordChunked` function
+
 ### Trigger Issues
 
 **Triggers not running**
@@ -781,6 +817,8 @@ To modify:
 ## Version History & Changes
 
 **Recent Changes**:
+- Added `reportFuelStatusToDiscordChunked()` for large structure lists (50+ structures)
+- Added chunked reporting menu item: "Report Fuel Status to Discord (Chunked)"
 - Refactored menu names: "Fuel Bot", "Moon Bot", "Setup" (from "Fuel stuff", "Moon Stuff")
 - Renamed functions: `updateFuelStatus` (from `updateStationFuel`)
 - Fixed GESI array parsing in moon-tracker.gs
@@ -812,6 +850,7 @@ To modify:
 **Key Functions**:
 - `updateFuelStatus()`: Pull fuel data
 - `reportFuelStatusToDiscord()`: Send fuel report
+- `reportFuelStatusToDiscordChunked()`: Send fuel report (chunked for 50+ structures)
 - `updateMoonExtractions()`: Pull moon data
 - `reportDailyMoonSummary()`: Send daily moon summary
 - `reportHourlyMoonStatusToDiscord()`: Send moon alerts

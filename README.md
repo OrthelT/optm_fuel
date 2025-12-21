@@ -7,6 +7,7 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 - Daily Discord updates showing which structures need fuel
 - Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
 - Automatic updates - set it once and forget it
+- **Chunked reporting** for large structure lists (50+ structures) to avoid Discord size limits
 <img width="333" height="532" alt="image" src="https://github.com/user-attachments/assets/0f94ac8b-4dc4-4788-be3c-c008b761e7c6" />
 
 ### Moon Bot
@@ -134,7 +135,7 @@ This is where you tell Google when to run each function automatically.
 
 **Trigger 2: Report Fuel to Discord**
 - Click **+ Add Trigger**
-- Function: **reportFuelStatusToDiscord**
+- Function: **reportFuelStatusToDiscord** (or **reportFuelStatusToDiscordChunked** for 50+ structures)
 - Event source: **Time-driven**
 - Type: **Day timer**
 - Time: Choose 1 hour AFTER Trigger 1 (e.g., 7am-8am)
@@ -208,6 +209,12 @@ If you see the reports in Discord, you're all set!
 **Empty moon extraction list**
 - This is normal if your corporation has no active moon extractions
 - Start a moon extraction in-game and run **Moon Bot** → **Update Moon Extractions** again
+
+**Discord errors with large structure lists (50+ structures)**
+- Discord has a 4096 character limit per message embed
+- Use **Fuel Bot** → **Report Fuel Status to Discord (Chunked)** instead
+- Or set your trigger to use `reportFuelStatusToDiscordChunked` function
+- This splits large reports into multiple messages automatically
 
 **Editing .gs files locally**
 - The `.gs` extension may not be recognized by your code editor

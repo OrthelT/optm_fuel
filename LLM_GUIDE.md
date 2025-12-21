@@ -48,6 +48,7 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
 **Moon Bot Menu:**
 - "Update Moon Extractions" → `updateMoonExtractions()`
 - "Report Moon Status to Discord" → `reportDailyMoonSummary()`
+- "Report Moon Status to Discord (Chunked)" → `reportDailyMoonSummaryChunked()`
 
 **Setup Menu:**
 - "Create Fuel and Moon Sheets" → `setupSheetsForNewUser()`
@@ -295,6 +296,35 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
 #### `checkMoonTrackerScriptExits()`
 - **Purpose**: Verification function called by setupSheetsForNewUser
 - **Returns**: `true` (simple existence check)
+
+#### `chunkFields(fields, maxFields)`
+- **Purpose**: Helper function that splits embed fields arrays into chunks
+- **Parameters**:
+  - `fields`: Array of Discord embed field objects
+  - `maxFields`: Maximum fields per chunk (default 20, leaving room for headers)
+- **Returns**: Array of field arrays, each under maxFields
+- **Use Case**: Discord allows max 25 fields per embed
+
+#### `reportHourlyMoonStatusToDiscordChunked()`
+- **Trigger**: Every hour (automated) OR manual
+- **Purpose**: Sends alerts for upcoming extractions, with chunking for large lists
+- **Use Case**: For corporations with many simultaneous extractions in the same time window
+- **Process**:
+  1. Same as `reportHourlyMoonStatusToDiscord()` but chunks fields
+  2. Splits into multiple messages if >20 extractions in alert window
+  3. Sends with 1-second delays between messages
+- **Chunk Titles**: When split, titles show "(1/3)", "(2/3)", etc.
+
+#### `reportDailyMoonSummaryChunked()`
+- **Trigger**: Daily (user-configured time) OR manual via menu
+- **Purpose**: Sends comprehensive summary of all extractions, with chunking
+- **Use Case**: For corporations with 20+ moon extractions
+- **Process**:
+  1. Sends header message first
+  2. Chunks recent extractions into groups of 18 fields
+  3. Chunks upcoming extractions into groups of 18 fields
+  4. Sends each chunk as separate message with 1-second delays
+- **Chunk Titles**: When split, section titles show "(1/3)", "(2/3)", etc.
 
 ## GESI Integration Details
 
@@ -566,6 +596,15 @@ Users must create these triggers in Apps Script (clock icon):
 - Menu: Fuel Bot → Report Fuel Status to Discord (Chunked)
 - For triggers: Update trigger to use `reportFuelStatusToDiscordChunked` function
 
+**Discord error 400 with large moon extraction lists**
+- Cause: Discord embed exceeds 25 fields limit
+- Symptom: Error message like "Request failed for https://discord.com/ returned code 400"
+- Solution: Use chunked moon functions instead:
+  - `reportDailyMoonSummaryChunked()` instead of `reportDailyMoonSummary()`
+  - `reportHourlyMoonStatusToDiscordChunked()` instead of `reportHourlyMoonStatusToDiscord()`
+- Menu: Moon Bot → Report Moon Status to Discord (Chunked)
+- For triggers: Update triggers to use chunked function names
+
 ### Trigger Issues
 
 **Triggers not running**
@@ -818,7 +857,9 @@ To modify:
 
 **Recent Changes**:
 - Added `reportFuelStatusToDiscordChunked()` for large structure lists (50+ structures)
-- Added chunked reporting menu item: "Report Fuel Status to Discord (Chunked)"
+- Added `reportDailyMoonSummaryChunked()` for large moon extraction lists (20+ moons)
+- Added `reportHourlyMoonStatusToDiscordChunked()` for many simultaneous extractions
+- Added chunked reporting menu items for both Fuel Bot and Moon Bot
 - Refactored menu names: "Fuel Bot", "Moon Bot", "Setup" (from "Fuel stuff", "Moon Stuff")
 - Renamed functions: `updateFuelStatus` (from `updateStationFuel`)
 - Fixed GESI array parsing in moon-tracker.gs
@@ -853,7 +894,9 @@ To modify:
 - `reportFuelStatusToDiscordChunked()`: Send fuel report (chunked for 50+ structures)
 - `updateMoonExtractions()`: Pull moon data
 - `reportDailyMoonSummary()`: Send daily moon summary
+- `reportDailyMoonSummaryChunked()`: Send daily moon summary (chunked for 20+ moons)
 - `reportHourlyMoonStatusToDiscord()`: Send moon alerts
+- `reportHourlyMoonStatusToDiscordChunked()`: Send moon alerts (chunked for many moons)
 - `setupSheetsForNewUser()`: Initial setup
 
 **GESI Library ID**:

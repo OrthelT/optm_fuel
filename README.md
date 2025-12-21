@@ -15,6 +15,7 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 - Advance warnings: 24 hours before and 1 hour before extraction ready time
 - Extraction ready notifications
 - Automatic hourly monitoring
+- **Chunked reporting** for large extraction lists (20+ moons) to avoid Discord limits
 <img width="381" height="445" alt="image" src="https://github.com/user-attachments/assets/1bcc579e-b54d-4831-900f-2f8fa64526ce" />
 <img width="269" height="160" alt="image" src="https://github.com/user-attachments/assets/7c383411-d2f8-4e81-bf98-a51fe1cfc827" />
 
@@ -151,7 +152,7 @@ This is where you tell Google when to run each function automatically.
 
 **Trigger 4: Daily Moon Summary**
 - Click **+ Add Trigger**
-- Function: **reportDailyMoonSummary**
+- Function: **reportDailyMoonSummary** (or **reportDailyMoonSummaryChunked** for 20+ moons)
 - Event source: **Time-driven**
 - Type: **Day timer**
 - Time: Choose 1 hour AFTER Trigger 3 (e.g., 7am-8am)
@@ -159,7 +160,7 @@ This is where you tell Google when to run each function automatically.
 
 **Trigger 5: Hourly Moon Alerts**
 - Click **+ Add Trigger**
-- Function: **reportHourlyMoonStatusToDiscord**
+- Function: **reportHourlyMoonStatusToDiscord** (or **reportHourlyMoonStatusToDiscordChunked** for many moons)
 - Event source: **Time-driven**
 - Type: **Hour timer**
 - Hours interval: **Every hour**
@@ -214,6 +215,12 @@ If you see the reports in Discord, you're all set!
 - Discord has a 4096 character limit per message embed
 - Use **Fuel Bot** → **Report Fuel Status to Discord (Chunked)** instead
 - Or set your trigger to use `reportFuelStatusToDiscordChunked` function
+- This splits large reports into multiple messages automatically
+
+**Discord errors with large moon extraction lists (20+ moons)**
+- Discord has a limit of 25 fields per embed
+- Use **Moon Bot** → **Report Moon Status to Discord (Chunked)** instead
+- Or set your triggers to use `reportDailyMoonSummaryChunked` and `reportHourlyMoonStatusToDiscordChunked`
 - This splits large reports into multiple messages automatically
 
 **Editing .gs files locally**

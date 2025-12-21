@@ -36,6 +36,7 @@ function onOpen() {
     ui.createMenu('Moon Bot')
       .addItem('Update Moon Extractions', 'updateMoonExtractions')
       .addItem('Report Moon Status to Discord', 'reportDailyMoonSummary')
+      .addItem('Report Moon Status to Discord (Chunked)', 'reportDailyMoonSummaryChunked')
       .addToUi();
   
     // Create a separate menu for the setup function

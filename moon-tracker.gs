@@ -378,7 +378,286 @@ function formatCountdown(arrival, now) {
   return days + " days " + hours + " hours\n(" + arrival.toUTCString() + ")";
 }
 
-//a quick hack to call and see if the page is here 
+/**
+ * Chunks an array of embed fields into groups that fit within Discord's limits.
+ * Discord allows max 25 fields per embed.
+ * @param {Array} fields - Array of field objects
+ * @param {number} maxFields - Maximum fields per chunk (default 20, leaving room for headers)
+ * @returns {Array} Array of field arrays, each under maxFields
+ */
+function chunkFields(fields, maxFields) {
+  maxFields = maxFields || 20;
+  var chunks = [];
+
+  for (var i = 0; i < fields.length; i += maxFields) {
+    chunks.push(fields.slice(i, i + maxFields));
+  }
+
+  return chunks;
+}
+
+/**
+ * Reports hourly moon status to Discord with chunking for large extraction lists.
+ * Use this instead of reportHourlyMoonStatusToDiscord when you have many simultaneous extractions.
+ */
+function reportHourlyMoonStatusToDiscordChunked() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var moonPullSheet = ss.getSheetByName("MoonPull");
+  var settingsSheet = ss.getSheetByName("Settings");
+
+  if (!moonPullSheet) return;
+
+  var data = moonPullSheet.getDataRange().getValues();
+  if (data.length <= 1) return;
+
+  var webhookUrl = settingsSheet.getRange("G3").getValue();
+  if (!webhookUrl) {
+    Logger.log("No Moon Webhook URL found in Settings!G3");
+    return;
+  }
+
+  var customName = settingsSheet.getRange('G5').getValue();
+  var customURL = settingsSheet.getRange('G8').getValue();
+  var botName = customName ? customName : (getCorpName() + " Mining Bot");
+  var logoUrl = customURL ? customURL : getCorpLogoUrl();
+
+  var now = new Date();
+  var upcomingExtractions = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var structureName = row[0];
+    var moonName = row[1];
+    var arrivalTimeStr = row[3];
+
+    var arrivalTime = new Date(arrivalTimeStr);
+    var timeDiff = arrivalTime.getTime() - now.getTime();
+    var hoursDiff = timeDiff / (1000 * 60 * 60);
+
+    var status = "";
+
+    if (hoursDiff >= 24 && hoursDiff < 25) {
+      status = "24h Warning";
+    } else if (hoursDiff >= 0.5 && hoursDiff < 1.5) {
+      status = "1h Warning";
+    } else if (hoursDiff >= -0.5 && hoursDiff < 0.5) {
+      status = "READY";
+    }
+
+    if (status) {
+      upcomingExtractions.push({
+        structure: structureName,
+        moon: moonName,
+        arrival: arrivalTime,
+        status: status,
+        hours: hoursDiff
+      });
+    }
+  }
+
+  if (upcomingExtractions.length === 0) return;
+
+  // Build fields array
+  var fields = [];
+  upcomingExtractions.forEach(function(ex) {
+    var msg = "";
+    if (ex.status === "READY") {
+      msg = "🟢 **EXTRACTION READY NOW**";
+    } else if (ex.status === "1h Warning") {
+      msg = "🟠 **Extraction in < 1 Hour**";
+    } else if (ex.status === "24h Warning") {
+      msg = "🟡 **Extraction coming up in 24 Hours**";
+    }
+
+    fields.push({
+      name: ex.structure + " - " + ex.moon,
+      value: msg + "\nArrival: " + ex.arrival.toUTCString()
+    });
+  });
+
+  // Chunk fields and send multiple messages if needed
+  var fieldChunks = chunkFields(fields, 20);
+  var messages = [];
+
+  for (var c = 0; c < fieldChunks.length; c++) {
+    var title = "Moon Extraction Update";
+    if (fieldChunks.length > 1) {
+      title += " (" + (c + 1) + "/" + fieldChunks.length + ")";
+    }
+
+    messages.push([{
+      title: title,
+      color: 16776960,
+      timestamp: now.toISOString(),
+      author: { name: botName, icon_url: logoUrl },
+      fields: fieldChunks[c]
+    }]);
+  }
+
+  // Send with delays between messages
+  for (var m = 0; m < messages.length; m++) {
+    sendToDiscord(messages[m], webhookUrl);
+    if (m < messages.length - 1) {
+      Utilities.sleep(1000);
+    }
+  }
+}
+
+/**
+ * Reports daily moon summary to Discord with chunking for large extraction lists.
+ * Use this instead of reportDailyMoonSummary when you have many extractions.
+ */
+function reportDailyMoonSummaryChunked() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var moonPullSheet = ss.getSheetByName("MoonPull");
+  var settingsSheet = ss.getSheetByName("Settings");
+
+  if (!moonPullSheet) {
+    setupSheetsForNewUser();
+  }
+
+  var check_data = moonPullSheet.getDataRange().getValues();
+  if (check_data.length <= 1) {
+    updateMoonExtractions();
+  }
+
+  var data = moonPullSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    var ui = SpreadsheetApp.getUi();
+    ui.alert("No moon data found");
+    return;
+  }
+
+  var webhookUrl = settingsSheet.getRange("G3").getValue();
+  if (!webhookUrl) return;
+
+  var customName = settingsSheet.getRange('G5').getValue();
+  var customURL = settingsSheet.getRange('G8').getValue();
+  var botName = customName ? customName : (getCorpName() + " Mining Bot");
+  var logoUrl = customURL ? customURL : getCorpLogoUrl();
+
+  var now = new Date();
+  var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+  var upcoming = [];
+  var recent = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var arrivalTime = new Date(row[3]);
+    if (isNaN(arrivalTime)) continue;
+
+    if (arrivalTime > now) {
+      upcoming.push({
+        structure: row[0],
+        moon: row[1],
+        arrival: arrivalTime
+      });
+    } else if (arrivalTime >= startOfYesterday) {
+      recent.push({
+        structure: row[0],
+        moon: row[1],
+        arrival: arrivalTime
+      });
+    }
+  }
+
+  upcoming.sort(function(a, b) { return a.arrival - b.arrival; });
+  recent.sort(function(a, b) { return a.arrival - b.arrival; });
+
+  if (upcoming.length === 0 && recent.length === 0) {
+    return;
+  }
+
+  // Build all fields
+  var recentFields = [];
+  var upcomingFields = [];
+
+  recent.forEach(function(ex) {
+    recentFields.push({
+      name: ex.structure + " - " + ex.moon,
+      value: "Completed: " + ex.arrival.toUTCString(),
+      inline: false
+    });
+  });
+
+  upcoming.forEach(function(ex) {
+    upcomingFields.push({
+      name: ex.structure + " - " + ex.moon,
+      value: "Ready in: " + formatCountdown(ex.arrival, now),
+      inline: false
+    });
+  });
+
+  var messages = [];
+
+  // Header message
+  messages.push([{
+    title: "Daily Moon Extraction Summary",
+    description: "Recent and upcoming extractions.",
+    color: 3447003,
+    timestamp: now.toISOString(),
+    author: { name: botName, icon_url: logoUrl }
+  }]);
+
+  // Recent extractions (chunked)
+  if (recentFields.length > 0) {
+    var recentChunks = chunkFields(recentFields, 18);
+    for (var r = 0; r < recentChunks.length; r++) {
+      var title = "🟪 Recent Extractions";
+      if (recentChunks.length > 1) {
+        title += " (" + (r + 1) + "/" + recentChunks.length + ")";
+      }
+
+      var fields = [{
+        name: title,
+        value: "Completed today or yesterday.",
+        inline: false
+      }];
+      fields = fields.concat(recentChunks[r]);
+
+      messages.push([{
+        color: 10181046, // Purple
+        fields: fields
+      }]);
+    }
+  }
+
+  // Upcoming extractions (chunked)
+  if (upcomingFields.length > 0) {
+    var upcomingChunks = chunkFields(upcomingFields, 18);
+    for (var u = 0; u < upcomingChunks.length; u++) {
+      var title = "🟦 Upcoming Extractions";
+      if (upcomingChunks.length > 1) {
+        title += " (" + (u + 1) + "/" + upcomingChunks.length + ")";
+      }
+
+      var fields = [{
+        name: title,
+        value: "Scheduled in the next few days.",
+        inline: false
+      }];
+      fields = fields.concat(upcomingChunks[u]);
+
+      messages.push([{
+        color: 3447003, // Blue
+        fields: fields
+      }]);
+    }
+  }
+
+  // Send with delays
+  for (var m = 0; m < messages.length; m++) {
+    sendToDiscord(messages[m], webhookUrl);
+    if (m < messages.length - 1) {
+      Utilities.sleep(1000);
+    }
+  }
+}
+
+//a quick hack to call and see if the page is here
 function checkMoonTrackerScriptExits() {
   return true
 }

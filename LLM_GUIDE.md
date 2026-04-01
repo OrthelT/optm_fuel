@@ -228,6 +228,50 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
 - **Purpose**: Alphabetical sorting comparator for structure arrays
 - **Returns**: -1, 0, or 1 for sort order
 
+### POS (Starbase) Fuel Tracking Functions (fuel-tracker.gs)
+
+#### Constants
+- **`POS_FUEL_TYPES`**: Maps type_id to fuel name (4051: Nitrogen Fuel Block, 4246: Hydrogen Fuel Block, 4247: Helium Fuel Block, 4312: Oxygen Fuel Block, 16275: Strontium Clathrates)
+- **`POS_STRONT_TYPE_ID`**: 16275 — Strontium Clathrates are reported but exempt from alert classification (only consumed under attack)
+- **`POS_FUEL_CRITICAL`**: 500 — fuel block quantity threshold for critical alert
+- **`POS_FUEL_WARNING`**: 1000 — fuel block quantity threshold for warning alert
+
+#### `getStarbaseMoonName(moonId)`
+- **Purpose**: Resolves moon_id to human-readable moon name
+- **GESI Call**: `GESI.universe_moons_moon(moonId)`
+- **Returns**: Moon name string or "Unknown Moon (id)" on failure
+- **Note**: Self-contained — does not depend on moon-tracker.gs
+
+#### `getStarbaseSystemName(systemId)`
+- **Purpose**: Resolves system_id to human-readable system name
+- **GESI Call**: `GESI.universe_systems_system(systemId)`
+- **Returns**: System name string or "Unknown System (id)" on failure
+
+#### `fetchStarbaseData(characterName)`
+- **Purpose**: Fetches all starbase data for a corporation and classifies fuel status
+- **GESI Calls**:
+  - `GESI.corporations_corporation_starbases(characterName)` — list of starbases
+  - `GESI.corporations_corporation_starbases_starbase(starbaseId, systemId, characterName)` — detail per starbase
+- **Required Scope**: `esi-corporations.read_starbases.v1`
+- **Classification Logic**: Based on fuel block quantities only (strontium exempt)
+  - Critical: any fuel block < 500
+  - Warning: any fuel block < 1000
+  - Healthy: all fuel blocks >= 1000
+  - Offline: state is "offline" (regardless of fuel)
+- **Rate Limiting**: 200ms between detail calls, 100ms between name resolution calls
+- **Caching**: Moon and system names are cached to avoid duplicate API calls
+- **Returns**: Array of `{moonName, systemName, state, typeId, fuels, status, lowestFuelBlock, lowestFuelBlockQty}`
+
+#### `buildStarbaseEmbeds(starbases, pingW, pingC)`
+- **Purpose**: Builds Discord embed objects for starbase fuel data
+- **Embed Colors**: Red (15158332) critical, Orange (16763904) warning, Green (3066993) healthy, Gray (9807270) offline
+- **Returns**: Array of embed objects to append to structure fuel embeds
+
+#### `updateStarbaseFuelStatus()`
+- **Trigger**: Manual via "Fuel Bot" → "Update POS Fuel Status"
+- **Purpose**: Debug function — fetches starbase data and logs to Logger
+- **Does Not**: Send to Discord (use reportFuelStatusToDiscord for that)
+
 ### Moon Tracking Functions (moon-tracker.gs)
 
 #### `updateMoonExtractions()`
@@ -396,6 +440,25 @@ Both are required. Library provides code, plugin provides authentication.
 - **Returns**: 2D array with moon name
 - **Auth Required**: No (public data)
 
+#### `GESI.corporations_corporation_starbases(characterName)`
+- **Purpose**: Get all corporation starbases (POS)
+- **Returns**: 2D array with starbase_id, moon_id, system_id, state, type_id
+- **Auth Required**: Yes
+- **Required Scope**: `esi-corporations.read_starbases.v1`
+
+#### `GESI.corporations_corporation_starbases_starbase(systemId, starbaseId, characterName)`
+- **Purpose**: Get fuel details for a specific starbase
+- **Parameter Order**: GESI places query params before path params — `systemId` (query, int32) comes before `starbaseId` (path, int64)
+- **Returns**: 2D array; `fuels` field contains array of `{type_id, quantity}`
+- **Auth Required**: Yes
+- **Required Scope**: `esi-corporations.read_starbases.v1`
+- **Note**: `fuels` may be returned as JSON string — parse if needed
+
+#### `GESI.universe_systems_system(systemId)`
+- **Purpose**: Get solar system information
+- **Returns**: 2D array with system name
+- **Auth Required**: No (public data)
+
 #### `GESI.getAuthenticatedCharacterNames()`
 - **Purpose**: List all authenticated characters
 - **Returns**: Array of character name strings
@@ -432,6 +495,7 @@ var value = data[1][columnIndex];  // First data row
 4. EVE SSO login opens in new tab
 5. User grants requested scopes:
    - `esi-corporations.read_structures.v1`
+   - `esi-corporations.read_starbases.v1` (required for POS fuel tracking)
    - `esi-industry.read_corporation_mining.v1`
    - `esi-universe.read_structures.v1`
 6. GESI stores auth token

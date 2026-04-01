@@ -14,6 +14,19 @@
  */
 var ss = SpreadsheetApp.getActiveSpreadsheet()
 
+// POS (Starbase) fuel type mapping and thresholds
+var POS_FUEL_TYPES = {
+  4051: "Nitrogen Fuel Block",
+  4246: "Hydrogen Fuel Block",
+  4247: "Helium Fuel Block",
+  4312: "Oxygen Fuel Block",
+  16275: "Strontium Clathrates"
+};
+// Strontium is only consumed under attack — exempt from alert classification
+var POS_STRONT_TYPE_ID = 16275;
+var POS_FUEL_CRITICAL = 500;
+var POS_FUEL_WARNING = 1000;
+
 // This function is triggered when the Google Sheets document is opened
 function onOpen() {
     var ui = SpreadsheetApp.getUi();
@@ -26,6 +39,8 @@ function onOpen() {
       .addItem('Report Fuel Status to Discord', 'reportFuelStatusToDiscord')
       // Add an item for chunked reporting (for large structure lists)
       .addItem('Report Fuel Status to Discord (Chunked)', 'reportFuelStatusToDiscordChunked')
+      .addSeparator()
+      .addItem('Update POS Fuel Status', 'updateStarbaseFuelStatus')
       // Add an item to clear cell D1 on the "CleanData" sheet
       .addItem('Clear Time', 'clearCellS2')
       // Add an item to get the UTC timestamp and output it to cell D1 on the "CleanData" sheet
@@ -410,10 +425,27 @@ function updateFuelStatus() {
       embeds.push(healthyEmbed);
     }
     
-    // Send embeds to Discord
-    sendToDiscord(embeds, discordWebhookUrl);
+    // Fetch and append POS (starbase) fuel data
+    var characterName = settingsSheet.getRange("A2").getValue();
+    if (characterName) {
+      var starbaseData = fetchStarbaseData(characterName);
+      var starbaseEmbeds = buildStarbaseEmbeds(starbaseData, pingW, pingC);
+      embeds = embeds.concat(starbaseEmbeds);
+    }
+
+    // Discord allows max 10 embeds per message — split if needed
+    if (embeds.length <= 10) {
+      sendToDiscord(embeds, discordWebhookUrl);
+    } else {
+      for (var e = 0; e < embeds.length; e += 10) {
+        sendToDiscord(embeds.slice(e, e + 10), discordWebhookUrl);
+        if (e + 10 < embeds.length) {
+          Utilities.sleep(1000);
+        }
+      }
+    }
   }
-  
+
   // This function sends a message to Discord using a webhook
   function sendToDiscord(embeds, webhookUrl) {
     // Prepare the payload to be sent to Discord
@@ -632,8 +664,337 @@ function updateFuelStatus() {
       }
     }
 
+    // Fetch and append POS (starbase) fuel data as chunked messages
+    var characterName = settingsSheet.getRange("A2").getValue();
+    if (characterName) {
+      var starbaseData = fetchStarbaseData(characterName);
+      if (starbaseData.length > 0) {
+        var starbaseEmbeds = buildStarbaseEmbeds(starbaseData, "", "");
+
+        // Each POS embed becomes a separate chunked message
+        starbaseEmbeds.forEach(function(embed) {
+          // Check if description exceeds Discord limit and chunk if needed
+          if (embed.description && embed.description.length > MAX_DESCRIPTION_LENGTH) {
+            var descChunks = [];
+            var lines = embed.description.split("\n");
+            var currentChunk = "";
+            lines.forEach(function(line) {
+              if (currentChunk.length + line.length + 1 > MAX_DESCRIPTION_LENGTH && currentChunk.length > 0) {
+                descChunks.push(currentChunk);
+                currentChunk = "";
+              }
+              currentChunk += line + "\n";
+            });
+            if (currentChunk.length > 0) descChunks.push(currentChunk);
+
+            for (var dc = 0; dc < descChunks.length; dc++) {
+              var chunkTitle = embed.title;
+              if (descChunks.length > 1) chunkTitle += " (" + (dc + 1) + "/" + descChunks.length + ")";
+              messages.push([{ title: chunkTitle, description: descChunks[dc], color: embed.color }]);
+            }
+          } else {
+            messages.push([embed]);
+          }
+        });
+      }
+    }
+
     // Send all messages with delays between them
     sendToDiscordChunked(messages, discordWebhookUrl);
+  }
+
+  // ============================================================
+  // POS (Starbase) Fuel Tracking
+  // ============================================================
+
+  /**
+   * Resolves a moon_id to a moon name via GESI.
+   * Self-contained — does not depend on moon-tracker.gs.
+   */
+  function getStarbaseMoonName(moonId) {
+    try {
+      var moon = GESI.universe_moons_moon(moonId);
+      if (moon && moon.length > 1) {
+        var headers = moon[0];
+        var nameIndex = headers.indexOf("name");
+        if (nameIndex >= 0) {
+          return moon[1][nameIndex];
+        }
+      }
+      return "Unknown Moon (" + moonId + ")";
+    } catch (e) {
+      Logger.log("Failed to resolve moon name for " + moonId + ": " + e);
+      return "Unknown Moon (" + moonId + ")";
+    }
+  }
+
+  /**
+   * Resolves a system_id to a system name via GESI.
+   */
+  function getStarbaseSystemName(systemId) {
+    try {
+      var system = GESI.universe_systems_system(systemId);
+      if (system && system.length > 1) {
+        var headers = system[0];
+        var nameIndex = headers.indexOf("name");
+        if (nameIndex >= 0) {
+          return system[1][nameIndex];
+        }
+      }
+      return "Unknown System (" + systemId + ")";
+    } catch (e) {
+      Logger.log("Failed to resolve system name for " + systemId + ": " + e);
+      return "Unknown System (" + systemId + ")";
+    }
+  }
+
+  /**
+   * Fetches starbase list and fuel details for a corporation.
+   * Returns an array of starbase objects with fuel data and classification.
+   * Classification is based on fuel block quantities only (strontium is exempt).
+   */
+  function fetchStarbaseData(characterName) {
+    var starbases = [];
+
+    // Fetch the starbase list
+    var starbaseList;
+    try {
+      starbaseList = GESI.corporations_corporation_starbases(characterName);
+    } catch (e) {
+      Logger.log("Failed to fetch starbases (GESI may not support this endpoint): " + e);
+      return starbases;
+    }
+
+    if (!starbaseList || starbaseList.length <= 1) {
+      Logger.log("No starbases found or empty response.");
+      return starbases;
+    }
+
+    // Parse headers from the list response
+    var listHeaders = starbaseList[0];
+    var idxStarbaseId = listHeaders.indexOf("starbase_id");
+    var idxMoonId = listHeaders.indexOf("moon_id");
+    var idxSystemId = listHeaders.indexOf("system_id");
+    var idxState = listHeaders.indexOf("state");
+    var idxTypeId = listHeaders.indexOf("type_id");
+
+    // Name caches to avoid duplicate API calls
+    var moonCache = {};
+    var systemCache = {};
+
+    for (var i = 1; i < starbaseList.length; i++) {
+      var row = starbaseList[i];
+      var starbaseId = row[idxStarbaseId];
+      var moonId = row[idxMoonId];
+      var systemId = row[idxSystemId];
+      var state = row[idxState];
+      var typeId = row[idxTypeId];
+
+      if (!starbaseId) continue;
+
+      // Resolve moon name (cached)
+      if (!moonCache[moonId]) {
+        moonCache[moonId] = getStarbaseMoonName(moonId);
+        Utilities.sleep(100);
+      }
+      var moonName = moonCache[moonId];
+
+      // Resolve system name (cached)
+      if (!systemCache[systemId]) {
+        systemCache[systemId] = getStarbaseSystemName(systemId);
+        Utilities.sleep(100);
+      }
+      var systemName = systemCache[systemId];
+
+      // Fetch fuel details for this starbase
+      var fuels = [];
+      try {
+        // GESI expects query params before path params: system_id (query, int32) then starbase_id (path, int64)
+        var detail = GESI.corporations_corporation_starbases_starbase(systemId, starbaseId, characterName);
+        if (detail && detail.length > 1) {
+          var detailHeaders = detail[0];
+          var idxFuels = detailHeaders.indexOf("fuels");
+          if (idxFuels >= 0) {
+            var rawFuels = detail[1][idxFuels];
+            // rawFuels may be a JSON string or already parsed
+            if (typeof rawFuels === "string") {
+              try { rawFuels = JSON.parse(rawFuels); } catch (e) { rawFuels = []; }
+            }
+            if (Array.isArray(rawFuels)) {
+              rawFuels.forEach(function(f) {
+                fuels.push({
+                  type_id: f.type_id,
+                  name: POS_FUEL_TYPES[f.type_id] || ("Unknown Fuel " + f.type_id),
+                  quantity: f.quantity
+                });
+              });
+            }
+          }
+        }
+      } catch (e) {
+        Logger.log("Failed to fetch detail for starbase " + starbaseId + ": " + e);
+      }
+
+      // Classify based on fuel block quantities only (exclude strontium)
+      var status = "healthy";
+      var minFuelBlockQty = Infinity;
+      var minFuelBlockName = "";
+
+      if (state === "offline") {
+        status = "offline";
+      } else {
+        fuels.forEach(function(fuel) {
+          if (fuel.type_id !== POS_STRONT_TYPE_ID) {
+            if (fuel.quantity < minFuelBlockQty) {
+              minFuelBlockQty = fuel.quantity;
+              minFuelBlockName = fuel.name;
+            }
+          }
+        });
+
+        // If no fuel blocks found at all, flag as critical
+        if (minFuelBlockQty === Infinity) {
+          status = "critical";
+          minFuelBlockName = "No fuel blocks";
+          minFuelBlockQty = 0;
+        } else if (minFuelBlockQty < POS_FUEL_CRITICAL) {
+          status = "critical";
+        } else if (minFuelBlockQty < POS_FUEL_WARNING) {
+          status = "warning";
+        }
+      }
+
+      starbases.push({
+        moonName: moonName,
+        systemName: systemName,
+        state: state,
+        typeId: typeId,
+        fuels: fuels,
+        status: status,
+        lowestFuelBlock: minFuelBlockName,
+        lowestFuelBlockQty: minFuelBlockQty
+      });
+
+      // Rate limit between detail calls
+      Utilities.sleep(200);
+    }
+
+    Logger.log("Fetched " + starbases.length + " starbases.");
+    return starbases;
+  }
+
+  /**
+   * Builds Discord embed objects for starbase fuel data.
+   * Strontium Clathrates are shown in the report but exempt from alert classification.
+   */
+  function buildStarbaseEmbeds(starbases, pingW, pingC) {
+    if (!starbases || starbases.length === 0) return [];
+
+    var critical = [];
+    var warning = [];
+    var healthy = [];
+    var offline = [];
+
+    starbases.forEach(function(sb) {
+      switch (sb.status) {
+        case "critical": critical.push(sb); break;
+        case "warning": warning.push(sb); break;
+        case "offline": offline.push(sb); break;
+        default: healthy.push(sb); break;
+      }
+    });
+
+    // Format a starbase line for the embed description
+    function formatStarbase(sb) {
+      var fuelStr = sb.fuels.map(function(f) {
+        return f.name + ": " + f.quantity;
+      }).join(", ");
+      if (!fuelStr) fuelStr = "No fuel data";
+      return "**" + sb.moonName + "** (" + sb.systemName + ") -- " + fuelStr + "\n";
+    }
+
+    var embeds = [];
+
+    // POS section header
+    embeds.push({
+      title: "Starbase (POS) Fuel Status",
+      description: starbases.length + " starbase(s) found",
+      color: 3447003
+    });
+
+    if (critical.length > 0) {
+      var critDesc = pingC || "";
+      critical.forEach(function(sb) { critDesc += formatStarbase(sb); });
+      embeds.push({
+        title: "🔴 CRITICAL POS - Immediate Action Required",
+        description: critDesc,
+        color: 15158332
+      });
+    }
+
+    if (warning.length > 0) {
+      var warnDesc = pingW || "";
+      warning.forEach(function(sb) { warnDesc += formatStarbase(sb); });
+      embeds.push({
+        title: "🟠 WARNING POS - Needs Attention",
+        description: warnDesc,
+        color: 16763904
+      });
+    }
+
+    if (healthy.length > 0) {
+      var healthDesc = "";
+      healthy.forEach(function(sb) { healthDesc += formatStarbase(sb); });
+      embeds.push({
+        title: "🟢 HEALTHY POS",
+        description: healthDesc,
+        color: 3066993
+      });
+    }
+
+    if (offline.length > 0) {
+      var offlineDesc = "";
+      offline.forEach(function(sb) {
+        offlineDesc += "**" + sb.moonName + "** (" + sb.systemName + ") -- Offline\n";
+      });
+      embeds.push({
+        title: "⚪ OFFLINE POS",
+        description: offlineDesc,
+        color: 9807270
+      });
+    }
+
+    return embeds;
+  }
+
+  /**
+   * Standalone function to fetch and log starbase fuel data.
+   * Callable from the Fuel Bot menu for debugging.
+   */
+  function updateStarbaseFuelStatus() {
+    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    var settingsSheet = spreadsheet.getSheetByName("Settings");
+    var characterName = settingsSheet.getRange("A2").getValue();
+
+    if (!characterName) {
+      Logger.log("No character name in Settings A2.");
+      return;
+    }
+
+    var starbases = fetchStarbaseData(characterName);
+    Logger.log("POS fuel data: " + JSON.stringify(starbases));
+
+    if (starbases.length === 0) {
+      Logger.log("No starbases found for " + characterName);
+    } else {
+      starbases.forEach(function(sb) {
+        Logger.log(sb.moonName + " (" + sb.systemName + ") - State: " + sb.state + " - Status: " + sb.status);
+        sb.fuels.forEach(function(f) {
+          Logger.log("  " + f.name + ": " + f.quantity);
+        });
+      });
+    }
   }
 
   // This function sets up the sheets for a new user

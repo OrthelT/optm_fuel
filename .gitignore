@@ -1,4 +1,5 @@
 ./venv
 venv/
 *.json
-CLAUDE.md
+pos.md
+fuel-tracker.bak

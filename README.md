@@ -8,6 +8,9 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 - Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
 - Automatic updates - set it once and forget it
 - **Chunked reporting** for large structure lists (50+ structures) to avoid Discord size limits
+- **POS (Starbase) fuel tracking** — reports fuel block levels for starbases alongside structure fuel
+  - Color-coded by fuel block quantity: 🔴 Critical (<500), 🟠 Needs Attention (<1000), 🟢 Healthy (≥1000), ⚪ Offline
+  - Strontium Clathrates are reported but exempt from alert classification (only consumed under attack)
 <img width="333" height="532" alt="image" src="https://github.com/user-attachments/assets/0f94ac8b-4dc4-4788-be3c-c008b761e7c6" />
 
 ### Moon Bot
@@ -105,6 +108,8 @@ GESI is a library that connects Google Sheets to EVE Online's API. [GESI Documen
 
 **Required Character Role:** Your character must have **Station Manager** or **Director** corporation role.
 
+**Note for POS Tracking:** The starbase endpoints require the `esi-corporations.read_starbases.v1` scope. If you added POS tracking after your initial authorization, you may need to re-authorize your character via **Extensions** → **GESI** → **Authorize Character** to grant this additional scope.
+
 ### Step 6: Configure Discord Webhooks
 
 You need to create two Discord webhooks (or use the same one for both):
@@ -179,7 +184,12 @@ This is where you tell Google when to run each function automatically.
 **Test Fuel Bot:**
 1. Return to your Google Sheet
 2. Click **Fuel Bot** → **Report Fuel Status to Discord**
-3. Check your Discord channel for the fuel report
+3. Check your Discord channel for the fuel report (includes both structure and POS fuel data)
+
+**Test POS Fuel (optional):**
+1. Click **Fuel Bot** → **Update POS Fuel Status**
+2. Check the Apps Script execution log (**Extensions** → **Apps Script** → **Executions**) for starbase data
+3. If starbases are found, they will automatically appear in the fuel Discord report
 
 **Test Moon Bot:**
 1. Click **Moon Bot** → **Update Moon Extractions** (this pulls current extraction data)
@@ -211,6 +221,12 @@ If you see the reports in Discord, you're all set!
 - This is normal if your corporation has no active moon extractions
 - Start a moon extraction in-game and run **Moon Bot** → **Update Moon Extractions** again
 
+**No POS/starbase data showing up**
+- Verify your character has **Station Manager** or **Director** role (same as structures)
+- Re-authorize via **Extensions** → **GESI** → **Authorize Character** to ensure the `esi-corporations.read_starbases.v1` scope is granted
+- Check the execution log for errors: **Extensions** → **Apps Script** → **Executions**
+- If you see "GESI may not support this endpoint", your GESI version may not include starbase functions — update to the latest GESI library version
+
 **Discord errors with large structure lists (50+ structures)**
 - Discord has a 4096 character limit per message embed
 - Use **Fuel Bot** → **Report Fuel Status to Discord (Chunked)** instead
@@ -239,7 +255,10 @@ In the **Settings** sheet:
 **Fuel Bot:**
 - Checks structure fuel levels daily
 - Categorizes structures: Critical (<3 days), Warning (3-7 days), Healthy (>7 days)
-- Sends one Discord message per day with all structures organized by urgency
+- Fetches POS (starbase) fuel data and classifies by fuel block quantity: Critical (<500), Needs Attention (<1000), Healthy (≥1000)
+- Strontium Clathrates levels are displayed but do not affect alert status (stront is only consumed when a POS is reinforced)
+- Offline starbases are shown separately
+- Sends one Discord message per day with all structures and starbases organized by urgency
 
 **Moon Bot:**
 - Checks moon extraction times hourly
@@ -254,6 +273,19 @@ After setup, your spreadsheet will contain:
 - **CleanData**: Processed fuel data with calculated expiration times
 - **MoonPull**: Moon extraction data with structure/moon names and times
 - **Instructions**: Quick setup reminders
+
+## Updating from a Previous Version
+
+If you already have the Fuel Bot set up and are updating to add POS fuel tracking:
+
+1. In your Google Sheet, click **Extensions** → **Apps Script**
+2. Replace the contents of `fuel-tracker.gs` with the latest version from this repo
+3. Click **Save** (💾)
+4. Close the Apps Script tab and refresh your Google Sheet (F5)
+5. Re-authorize your character: **Extensions** → **GESI** → **Authorize Character** (needed for the `esi-corporations.read_starbases.v1` scope)
+6. Test by clicking **Fuel Bot** → **Update POS Fuel Status** and checking the execution log
+
+No new triggers are needed — POS data is automatically included in the existing `reportFuelStatusToDiscord` and `reportFuelStatusToDiscordChunked` functions.
 
 ## Contributing
 

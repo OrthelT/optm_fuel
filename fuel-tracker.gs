@@ -449,7 +449,9 @@ function updateFuelStatus() {
   // Sends embeds to a Discord webhook, retrying on 429.
   // Why: Apps Script's outbound IPs are shared across all GAS users, so Cloudflare
   // (error 1015) can throttle us before our request reaches Discord — independent
-  // of our own request rate. The retry/backoff is the only fix.
+  // of our own request rate. The retry/backoff handles transient throttling;
+  // any other failure (404 webhook, 400 payload, exhausted retries) throws so the
+  // Apps Script execution shows as failed in the trigger dashboard.
   function sendToDiscord(embeds, webhookUrl) {
     var maxAttempts = 3;
     var fallbackWaitsMs = [10000, 30000]; // used when Retry-After is missing
@@ -463,11 +465,12 @@ function updateFuelStatus() {
       });
 
       var code = response.getResponseCode();
-      if (code >= 200 && code < 300) return true;
+      if (code >= 200 && code < 300) return;
 
       if (code !== 429) {
-        Logger.log("Discord error " + code + ": " + response.getContentText().substring(0, 300));
-        return false;
+        var body = response.getContentText().substring(0, 300);
+        Logger.log("Discord error " + code + ": " + body);
+        throw new Error("Discord webhook failed with code " + code + ": " + body);
       }
 
       if (attempt === maxAttempts - 1) break;
@@ -482,8 +485,7 @@ function updateFuelStatus() {
       Utilities.sleep(waitMs);
     }
 
-    Logger.log("Discord webhook failed after " + maxAttempts + " attempts (429).");
-    return false;
+    throw new Error("Discord webhook failed after " + maxAttempts + " attempts (429 rate limit).");
   }
 
   /**

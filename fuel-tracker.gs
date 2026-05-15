@@ -440,23 +440,50 @@ function updateFuelStatus() {
       for (var e = 0; e < embeds.length; e += 10) {
         sendToDiscord(embeds.slice(e, e + 10), discordWebhookUrl);
         if (e + 10 < embeds.length) {
-          Utilities.sleep(1000);
+          Utilities.sleep(2000);
         }
       }
     }
   }
 
-  // This function sends a message to Discord using a webhook
+  // Sends embeds to a Discord webhook, retrying on 429.
+  // Why: Apps Script's outbound IPs are shared across all GAS users, so Cloudflare
+  // (error 1015) can throttle us before our request reaches Discord — independent
+  // of our own request rate. The retry/backoff is the only fix.
   function sendToDiscord(embeds, webhookUrl) {
-    // Prepare the payload to be sent to Discord
-    var payload = {
-      method: "POST",
-      contentType: "application/json",
-      payload: JSON.stringify({ embeds: embeds }),
-    };
+    var maxAttempts = 3;
+    var fallbackWaitsMs = [10000, 30000]; // used when Retry-After is missing
 
-    // Send the HTTP request to the Discord webhook URL
-    UrlFetchApp.fetch(webhookUrl, payload);
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      var response = UrlFetchApp.fetch(webhookUrl, {
+        method: "POST",
+        contentType: "application/json",
+        payload: JSON.stringify({ embeds: embeds }),
+        muteHttpExceptions: true
+      });
+
+      var code = response.getResponseCode();
+      if (code >= 200 && code < 300) return true;
+
+      if (code !== 429) {
+        Logger.log("Discord error " + code + ": " + response.getContentText().substring(0, 300));
+        return false;
+      }
+
+      if (attempt === maxAttempts - 1) break;
+
+      var headers = response.getHeaders();
+      var retryAfterRaw = headers["Retry-After"] || headers["retry-after"];
+      var waitMs = retryAfterRaw
+        ? Math.ceil(parseFloat(retryAfterRaw) * 1000)
+        : fallbackWaitsMs[attempt];
+      Logger.log("Discord 429 on attempt " + (attempt + 1) + "/" + maxAttempts +
+                 " — sleeping " + waitMs + "ms");
+      Utilities.sleep(waitMs);
+    }
+
+    Logger.log("Discord webhook failed after " + maxAttempts + " attempts (429).");
+    return false;
   }
 
   /**
@@ -499,9 +526,10 @@ function updateFuelStatus() {
     for (var i = 0; i < messages.length; i++) {
       sendToDiscord(messages[i], webhookUrl);
 
-      // Wait 1 second between messages to respect Discord rate limits
+      // Pace messages to stay well under Discord/Cloudflare rate limits.
+      // sendToDiscord retries on 429, so this is defense-in-depth.
       if (i < messages.length - 1) {
-        Utilities.sleep(1000);
+        Utilities.sleep(2000);
       }
     }
   }

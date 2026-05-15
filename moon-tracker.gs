@@ -498,7 +498,7 @@ function reportHourlyMoonStatusToDiscordChunked() {
   for (var m = 0; m < messages.length; m++) {
     sendToDiscord(messages[m], webhookUrl);
     if (m < messages.length - 1) {
-      Utilities.sleep(1000);
+      Utilities.sleep(2000);
     }
   }
 }
@@ -652,7 +652,7 @@ function reportDailyMoonSummaryChunked() {
   for (var m = 0; m < messages.length; m++) {
     sendToDiscord(messages[m], webhookUrl);
     if (m < messages.length - 1) {
-      Utilities.sleep(1000);
+      Utilities.sleep(2000);
     }
   }
 }

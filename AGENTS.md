@@ -69,6 +69,8 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
 - `G5`: Custom bot name (optional, defaults to "[Corp Name] Fuel Bot" or "[Corp Name] Mining Bot")
 - `G7`: "Logo URL (optional)" (label)
 - `G8`: Custom logo URL (optional, defaults to corp logo)
+- `F11`: "Enable POS Reports" (label)
+- `G11`: Set to "Yes" (case-insensitive) or `TRUE` to include starbase (POS) fuel data in scheduled reports. Anything else (default `"No"`, blank, etc.) skips POS fetching. Requires the character to have the Director role and the `esi-corporations.read_starbases.v1` scope. The manual "Update POS Fuel Status" menu item ignores this setting and always tries to fetch.
 - `G13`: Fuel Warning role ping id
 - `G14`: Fuel Critical role ping id
 

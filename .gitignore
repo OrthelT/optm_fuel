@@ -4,3 +4,4 @@ venv/
 pos.md
 fuel-tracker.bak
 node_modules/
+.env

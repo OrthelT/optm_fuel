@@ -1,0 +1,8 @@
+name = "optm-fuel-proxy"
+main = "worker.js"
+compatibility_date = "2026-05-18"
+
+# Secrets are NOT defined here — set them with:
+#   wrangler secret put PROXY_KEY
+#   wrangler secret put FUEL_WEBHOOK_URL
+#   wrangler secret put MOON_WEBHOOK_URL

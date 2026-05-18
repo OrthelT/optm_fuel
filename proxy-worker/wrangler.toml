@@ -1,6 +1,8 @@
 name = "optm-fuel-proxy"
 main = "worker.js"
 compatibility_date = "2026-05-18"
+workers_dev = true   # explicit so future deploys don't warn
+preview_urls = false # only the canonical workers.dev URL is reachable
 
 # Secrets are NOT defined here — set them with:
 #   wrangler secret put PROXY_KEY

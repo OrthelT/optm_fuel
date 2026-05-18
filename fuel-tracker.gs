@@ -566,19 +566,42 @@ function updateFuelStatus() {
    * @param {string} webhookUrl - Discord webhook URL
    */
   function sendToDiscordChunked(messages, webhookUrl) {
+    // Discord enforces both limits on a single webhook POST:
+    //   - max 10 embed objects per message
+    //   - max 6000 total characters across all embeds in the message
+    // The 200-char safety margin protects against fields we don't size (e.g. emoji byte-vs-char).
     var MAX_EMBEDS_PER_BATCH = 10;
-    var batches = [[]];
+    var MAX_CHARS_PER_BATCH = 5800;
+
+    function embedSize(e) {
+      var s = (e.title || "").length + (e.description || "").length;
+      if (e.author && e.author.name) s += e.author.name.length;
+      if (e.footer && e.footer.text) s += e.footer.text.length;
+      if (e.fields) {
+        e.fields.forEach(function(f) {
+          s += (f.name || "").length + (f.value || "").length;
+        });
+      }
+      return s;
+    }
+
+    var batches = [];
+    var currentBatch = null;
+    var currentChars = 0;
     messages.forEach(function(m) {
       m.forEach(function(embed) {
-        var last = batches[batches.length - 1];
-        if (last.length >= MAX_EMBEDS_PER_BATCH) {
-          last = [];
-          batches.push(last);
+        var size = embedSize(embed);
+        if (!currentBatch ||
+            currentBatch.length >= MAX_EMBEDS_PER_BATCH ||
+            currentChars + size > MAX_CHARS_PER_BATCH) {
+          currentBatch = [];
+          batches.push(currentBatch);
+          currentChars = 0;
         }
-        last.push(embed);
+        currentBatch.push(embed);
+        currentChars += size;
       });
     });
-    batches = batches.filter(function(b) { return b.length > 0; });
 
     for (var i = 0; i < batches.length; i++) {
       sendToDiscord(batches[i], webhookUrl);

@@ -69,6 +69,8 @@ When the spreadsheet opens, `onOpen()` creates three custom menus:
 - `G5`: Custom bot name (optional, defaults to "[Corp Name] Fuel Bot" or "[Corp Name] Mining Bot")
 - `G7`: "Logo URL (optional)" (label)
 - `G8`: Custom logo URL (optional, defaults to corp logo)
+- `F11`: "Enable POS Reports" (label)
+- `G11`: Set to "Yes" (case-insensitive) or `TRUE` to include starbase (POS) fuel data in scheduled reports. Anything else (default `"No"`, blank, etc.) skips POS fetching. Requires the character to have the Director role and the `esi-corporations.read_starbases.v1` scope. The manual "Update POS Fuel Status" menu item ignores this setting and always tries to fetch.
 - `G13`: Fuel Warning role ping id
 - `G14`: Fuel Critical role ping id
 
@@ -670,6 +672,23 @@ Users must create these triggers in Apps Script (clock icon):
   - `reportHourlyMoonStatusToDiscordChunked()` instead of `reportHourlyMoonStatusToDiscord()`
 - Menu: Moon Bot → Report Moon Status to Discord (Chunked)
 - For triggers: Update triggers to use chunked function names
+
+**Discord error 400: "Embed size exceeds maximum size of 6000"**
+- Cause: Discord enforces 6000 total characters across all embeds in a single POST (separate from the per-embed 6000 limit). This can fire when many embeds get bundled into one message.
+- Symptom: Log line `{"embeds": ["Embed size exceeds maximum size of 6000"]}`. The diagnostic logging in `sendToDiscord` prints an embed inventory (`[0] title=N desc=N fields=N`) showing the sizes. If the sum is over ~6000, this is the limit.
+- Solution: This is already handled in `sendToDiscordChunked` — it batches by both embed count (≤10) AND total characters (≤5800 with safety margin). If a user is still hitting this, verify they have the current `fuel-tracker.gs` and not a stale copy.
+
+### Rate Limiting (Cloudflare 1015)
+
+**Persistent Discord delivery failures with long `Retry-After` values**
+- Cause: Google Apps Script's outbound IP pool is shared across all GAS users worldwide. Cloudflare (Discord's edge) throttles the entire IP at the network layer with HTTP 429 + a body of `error code: 1015`. This is independent of your script's request rate — collateral damage from other GAS users.
+- Symptom: Execution log shows `Retry-After=164` or `Retry-After=741` (seconds), or the diagnostic line `Discord Retry-After Nms exceeds in-script cap`. The response `Content-Type` is `text/plain` (not `application/json`) and the body is the 16-byte string `error code: 1015\n`.
+- Distinguishing this from real Discord 429: Discord-actual 429 responses include `x-ratelimit-bucket`, `x-ratelimit-limit`, etc., and a JSON body with a `retry_after` field. Cloudflare 1015 responses have none of those. The presence of Discord's `x-ratelimit-*` headers proves the request reached Discord; their absence means it died at the edge.
+- Script-level mitigations already in place (in current `fuel-tracker.gs`):
+  - `sendToDiscord` caps any single sleep at 90s and aborts cleanly rather than crashing on GAS's `Utilities.sleep` maximum
+  - `sendToDiscordChunked` batches up to 10 embeds and 5800 chars per HTTP POST, reducing request volume by ~3–5x
+  - These reduce the *probability* of hitting 1015 but cannot eliminate it — the shared IP is throttled regardless of our footprint
+- Permanent fix: deploy a Cloudflare Worker proxy from a non-GAS IP. See `proxy-worker/SETUP.md` for the deployment guide. After setup, Settings G2/G3 point at the Worker URL instead of Discord directly; the Worker forwards to Discord from Cloudflare's IP space, bypassing the GAS pool entirely.
 
 ### Trigger Issues
 

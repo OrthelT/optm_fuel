@@ -27,6 +27,16 @@ var POS_STRONT_TYPE_ID = 16275;
 var POS_FUEL_CRITICAL = 500;
 var POS_FUEL_WARNING = 1000;
 
+// Reads Settings G11 to decide whether scheduled fuel reports include starbase (POS) data.
+// Disabled by default so reports still work for characters without the Director role /
+// esi-corporations.read_starbases.v1 scope. Accepts boolean true (checkbox cell) or the
+// string "Yes" (case-insensitive). The manual "Update POS Fuel Status" menu item runs regardless.
+function isStarbaseReportingEnabled(settingsSheet) {
+  var v = settingsSheet.getRange("G11").getValue();
+  if (v === true) return true;
+  return String(v || "").trim().toLowerCase() === "yes";
+}
+
 // This function is triggered when the Google Sheets document is opened
 function onOpen() {
     var ui = SpreadsheetApp.getUi();
@@ -427,23 +437,13 @@ function updateFuelStatus() {
     
     // Fetch and append POS (starbase) fuel data
     var characterName = settingsSheet.getRange("A2").getValue();
-    if (characterName) {
+    if (characterName && isStarbaseReportingEnabled(settingsSheet)) {
       var starbaseData = fetchStarbaseData(characterName);
       var starbaseEmbeds = buildStarbaseEmbeds(starbaseData, pingW, pingC);
       embeds = embeds.concat(starbaseEmbeds);
     }
 
-    // Discord allows max 10 embeds per message — split if needed
-    if (embeds.length <= 10) {
-      sendToDiscord(embeds, discordWebhookUrl);
-    } else {
-      for (var e = 0; e < embeds.length; e += 10) {
-        sendToDiscord(embeds.slice(e, e + 10), discordWebhookUrl);
-        if (e + 10 < embeds.length) {
-          Utilities.sleep(2000);
-        }
-      }
-    }
+    sendToDiscord(embeds, discordWebhookUrl);
   }
 
   // Sends embeds to a Discord webhook, retrying on 429.
@@ -454,7 +454,11 @@ function updateFuelStatus() {
   // Apps Script execution shows as failed in the trigger dashboard.
   function sendToDiscord(embeds, webhookUrl) {
     var maxAttempts = 3;
-    var fallbackWaitsMs = [10000, 30000]; // used when Retry-After is missing
+    var fallbackWaitsMs = [10000, 30000]; // used when no Retry-After is parseable
+    // Cap each sleep so Utilities.sleep doesn't throw "Specified sleep period exceeds maximum",
+    // and so we don't burn our 6-min script budget on a wait that won't unblock us anyway
+    // (Cloudflare 1015 wants minutes; the next scheduled trigger gets a fresh outbound IP).
+    var MAX_SLEEP_MS = 90000;
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       var response = UrlFetchApp.fetch(webhookUrl, {
@@ -468,24 +472,58 @@ function updateFuelStatus() {
       if (code >= 200 && code < 300) return;
 
       if (code !== 429) {
-        var body = response.getContentText().substring(0, 300);
-        Logger.log("Discord error " + code + ": " + body);
-        throw new Error("Discord webhook failed with code " + code + ": " + body);
+        var fullBody = response.getContentText();
+        // On 400, Discord's webhook errors are often terse ("embeds: [2]") and don't say what's wrong.
+        // Log embed sizes so the user can correlate index → which embed → which limit got tripped
+        // (per-embed description 4096, title 256, fields 25, total embed-set chars 6000).
+        var inventory = embeds.map(function(em, i) {
+          return "  [" + i + "] title=" + ((em.title || "").length) +
+                 " desc=" + ((em.description || "").length) +
+                 " fields=" + ((em.fields || []).length);
+        }).join("\n");
+        Logger.log("Discord error " + code + ":\n" + fullBody + "\nEmbed inventory:\n" + inventory);
+        throw new Error("Discord webhook failed with code " + code + ": " + fullBody.substring(0, 500));
       }
 
       if (attempt === maxAttempts - 1) break;
 
-      var headers = response.getHeaders();
-      var retryAfterRaw = headers["Retry-After"] || headers["retry-after"];
-      var waitMs = retryAfterRaw
-        ? Math.ceil(parseFloat(retryAfterRaw) * 1000)
-        : fallbackWaitsMs[attempt];
+      var waitMs = parseRetryAfterMs(response, fallbackWaitsMs[attempt]);
+      if (waitMs > MAX_SLEEP_MS) {
+        Logger.log("Discord Retry-After " + waitMs + "ms exceeds in-script cap (" +
+                   MAX_SLEEP_MS + "ms) — aborting; next trigger will retry");
+        throw new Error("Discord rate-limited for " + Math.round(waitMs / 1000) +
+                        "s — exceeds in-script wait cap. Next scheduled trigger will retry.");
+      }
+
       Logger.log("Discord 429 on attempt " + (attempt + 1) + "/" + maxAttempts +
                  " — sleeping " + waitMs + "ms");
       Utilities.sleep(waitMs);
     }
 
     throw new Error("Discord webhook failed after " + maxAttempts + " attempts (429 rate limit).");
+  }
+
+  // Returns how long to wait (milliseconds) before retrying a 429. Order of preference:
+  //   1. Discord JSON body `retry_after` — float seconds, canonical and documented.
+  //   2. `Retry-After` HTTP header — interpreted as seconds (RFC). This is the Cloudflare 1015 path,
+  //      where the response body is HTML and parsing as JSON fails.
+  //   3. Caller-provided fallback.
+  // We deliberately do NOT trust the Retry-After header on Discord-proper responses: Discord webhook
+  // endpoints have long returned it in milliseconds rather than seconds, so naive (header * 1000)
+  // double-scales a 3.6-second wait into an hour and trips Utilities.sleep's max.
+  function parseRetryAfterMs(response, fallbackMs) {
+    try {
+      var body = JSON.parse(response.getContentText());
+      if (body && typeof body.retry_after === "number") {
+        return Math.ceil(body.retry_after * 1000);
+      }
+    } catch (e) { /* non-JSON body (e.g. Cloudflare 1015 HTML) — fall through */ }
+
+    var headers = response.getHeaders();
+    var raw = headers["Retry-After"] || headers["retry-after"];
+    var parsed = raw ? parseFloat(raw) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0) return Math.ceil(parsed * 1000);
+    return fallbackMs;
   }
 
   /**
@@ -520,17 +558,54 @@ function updateFuelStatus() {
   }
 
   /**
-   * Sends multiple Discord messages sequentially with delays to avoid rate limiting.
-   * @param {Array} messages - Array of embed arrays, each will be sent as a separate message
+   * Sends embeds to Discord, batching up to 10 per HTTP request (Discord's per-message max).
+   * Callers can pass each embed as its own "message" (single-element array); this function
+   * combines consecutive embeds into batches to minimize request count — the dominant factor
+   * in Cloudflare 1015 throttling on shared GAS outbound IPs.
+   * @param {Array} messages - Array of embed arrays
    * @param {string} webhookUrl - Discord webhook URL
    */
   function sendToDiscordChunked(messages, webhookUrl) {
-    for (var i = 0; i < messages.length; i++) {
-      sendToDiscord(messages[i], webhookUrl);
+    // Discord enforces both limits on a single webhook POST:
+    //   - max 10 embed objects per message
+    //   - max 6000 total characters across all embeds in the message
+    // The 200-char safety margin protects against fields we don't size (e.g. emoji byte-vs-char).
+    var MAX_EMBEDS_PER_BATCH = 10;
+    var MAX_CHARS_PER_BATCH = 5800;
 
-      // Pace messages to stay well under Discord/Cloudflare rate limits.
-      // sendToDiscord retries on 429, so this is defense-in-depth.
-      if (i < messages.length - 1) {
+    function embedSize(e) {
+      var s = (e.title || "").length + (e.description || "").length;
+      if (e.author && e.author.name) s += e.author.name.length;
+      if (e.footer && e.footer.text) s += e.footer.text.length;
+      if (e.fields) {
+        e.fields.forEach(function(f) {
+          s += (f.name || "").length + (f.value || "").length;
+        });
+      }
+      return s;
+    }
+
+    var batches = [];
+    var currentBatch = null;
+    var currentChars = 0;
+    messages.forEach(function(m) {
+      m.forEach(function(embed) {
+        var size = embedSize(embed);
+        if (!currentBatch ||
+            currentBatch.length >= MAX_EMBEDS_PER_BATCH ||
+            currentChars + size > MAX_CHARS_PER_BATCH) {
+          currentBatch = [];
+          batches.push(currentBatch);
+          currentChars = 0;
+        }
+        currentBatch.push(embed);
+        currentChars += size;
+      });
+    });
+
+    for (var i = 0; i < batches.length; i++) {
+      sendToDiscord(batches[i], webhookUrl);
+      if (i < batches.length - 1) {
         Utilities.sleep(2000);
       }
     }
@@ -696,7 +771,7 @@ function updateFuelStatus() {
 
     // Fetch and append POS (starbase) fuel data as chunked messages
     var characterName = settingsSheet.getRange("A2").getValue();
-    if (characterName) {
+    if (characterName && isStarbaseReportingEnabled(settingsSheet)) {
       var starbaseData = fetchStarbaseData(characterName);
       if (starbaseData.length > 0) {
         var starbaseEmbeds = buildStarbaseEmbeds(starbaseData, "", "");
@@ -1118,9 +1193,12 @@ function updateFuelStatus() {
       settingsSheet.getRange("H14").setValue("<-- Critical");
       settingsSheet.getRange("F10").setValue("Enable Chunking");
       settingsSheet.getRange("H10").setValue("<-- Set to 'Yes' to split large reports into multiple messages (for 50+ structures)")
+      settingsSheet.getRange("F11").setValue("Enable POS Reports");
+      settingsSheet.getRange("G11").setValue("No");
+      settingsSheet.getRange("H11").setValue("<-- Set to 'Yes' to include starbase (POS) fuel in scheduled reports (requires Director role + esi-corporations.read_starbases.v1)")
 
       // Define a range of cells where values should be entered so we can format them differently
-      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8','G10','G13','G14'])
+      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8','G10','G11','G13','G14'])
       valueCells.setBackground('yellow')
     }
     //setup moon sheets (code is in moon_tracker.gs)

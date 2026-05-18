@@ -3,3 +3,5 @@ venv/
 *.json
 pos.md
 fuel-tracker.bak
+node_modules/
+.env

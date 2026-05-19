@@ -1,8 +1,7 @@
 # EVE Online Structure Manager
-
 Automatically track your structure fuel levels AND moon extractions with Discord notifications. No coding required!
 
-## What You'll Get
+## Features
 ### Fuel Bot
 - Daily Discord updates showing which structures need fuel
 - Color-coded alerts (🔴 Critical, 🟠 Warning, 🟢 Healthy)
@@ -27,21 +26,18 @@ Automatically track your structure fuel levels AND moon extractions with Discord
 - Custom bot name and logo can be configured on the setting sheet.
 
 ## What You Need
-
 1. A Google account
 2. An EVE Online character with **Station Manager** or **Director** corporation role
 3. A Discord server where you can create webhooks
 
 ## If You Need Help
-
-- The **LLM_GUIDE.md** file contains everything an LLM needs to help you get set up. Point your LLM assistant at this repo or paste the guide into your chat.
+- The **AGENTS.md** file contains everything an LLM needs to help you get set up. Point your LLM assistant at this repo or paste the guide into your chat.
 - Join my Discord for questions or suggestions: [Orthel's Lab](https://discord.gg/5FdUr9KRde)
 
 ## Setup (10-15 minutes)
 *Note: Some locales have different syntax. If you encounter errors, switch locale to US.*
 
 ### Step 1: Create Your Google Sheet
-
 1. Go to [Google Sheets](https://sheets.google.com) and create a new blank spreadsheet
 2. Name it something like "EVE Structure Manager"
 
@@ -238,6 +234,13 @@ If you see the reports in Discord, you're all set!
 - Use **Moon Bot** → **Report Moon Status to Discord (Chunked)** instead
 - Or set your triggers to use `reportDailyMoonSummaryChunked` and `reportHourlyMoonStatusToDiscordChunked`
 - This splits large reports into multiple messages automatically
+
+**Discord delivery failures with `Retry-After` of many seconds, `status code 429`` or `error code: 1015`**
+- Symptom: Apps Script execution logs show errors like `Retry-After=164` (or higher), or response bodies containing `error code: 1015`. Messages stop arriving in Discord, sometimes for hours.
+- Cause: This is **not** caused by your script's request rate. Google Apps Script shares a small pool of outbound IP addresses across all GAS users worldwide. Cloudflare (which sits in front of Discord) throttles that entire IP pool at the network edge when *any* of those users misbehave. You get caught in the collateral damage.
+- **Fix for occasional failures (once a week or so):** Make sure your `fuel-tracker.gs` is up to date. The latest version includes a sleep cap (so long retry waits don't crash the script), request batching (fewer HTTP POSTs by bundling embeds), and smarter `Retry-After` parsing. These reduce the *probability* of hitting the throttle.
+- **Fix for persistent failures (daily, or `Retry-After` measured in minutes):** Deploy a tiny Cloudflare Worker as a webhook proxy. The Worker runs from a Cloudflare IP, not a GAS IP, so it bypasses the throttled pool entirely. You then point Settings G2/G3 at the Worker URL instead of Discord directly.
+- Full deployment guide: [`proxy-worker/SETUP.md`](proxy-worker/SETUP.md). It walks through Cloudflare account creation, installing `wrangler`, generating a proxy key, deploying the Worker, and updating your sheet — roughly 15 minutes end-to-end, free tier.
 
 **Editing .gs files locally**
 - The `.gs` extension may not be recognized by your code editor

@@ -12,10 +12,13 @@
  * 
  * The script uses time-based triggers to run these functions at specified intervals.
  */
-var ss = SpreadsheetApp.getActiveSpreadsheet()
+// Shared across all .gs files in the project. Top-level code runs before every
+// execution (triggers, menu items, onOpen), so keep it free of side effects.
+const ss = SpreadsheetApp.getActiveSpreadsheet();
+const settingsSheet = ss.getSheetByName("Settings");
 
 // POS (Starbase) fuel type mapping and thresholds
-var POS_FUEL_TYPES = {
+const POS_FUEL_TYPES = {
   4051: "Nitrogen Fuel Block",
   4246: "Hydrogen Fuel Block",
   4247: "Helium Fuel Block",
@@ -23,9 +26,9 @@ var POS_FUEL_TYPES = {
   16275: "Strontium Clathrates"
 };
 // Strontium is only consumed under attack — exempt from alert classification
-var POS_STRONT_TYPE_ID = 16275;
-var POS_FUEL_CRITICAL = 500;
-var POS_FUEL_WARNING = 1000;
+const POS_STRONT_TYPE_ID = 16275;
+const POS_FUEL_CRITICAL = 500;
+const POS_FUEL_WARNING = 1000;
 
 // Reads Settings G11 to decide whether scheduled fuel reports include starbase (POS) data.
 // Disabled by default so reports still work for characters without the Director role /
@@ -35,6 +38,17 @@ function isStarbaseReportingEnabled(settingsSheet) {
   var v = settingsSheet.getRange("G11").getValue();
   if (v === true) return true;
   return String(v || "").trim().toLowerCase() === "yes";
+}
+
+// Logs a message and, when a user is present, shows it as a popup.
+// SpreadsheetApp.getUi() throws when called from a time-driven trigger, so the popup is best-effort.
+function alertUser(message) {
+  console.log(message);
+  try {
+    SpreadsheetApp.getUi().alert(message);
+  } catch (err) {
+    // No UI in trigger executions; the log line above is the record.
+  }
 }
 
 // This function is triggered when the Google Sheets document is opened
@@ -106,15 +120,14 @@ function onOpen() {
     try{
       var authCharacters = GESI.getAuthenticatedCharacterNames();
     } catch(err) {
-      ui.alert("Error" + err + "did your forget to set up GESI?");
+      alertUser("Error: " + err + ". Did you forget to set up GESI?");
       return false;
     }
     try {
     var num_chars = authCharacters.length;
     Logger.log("Found " + num_chars + "character(s): " + authCharacters);
     } catch {
-      Logger.log("No authenticated characters found.");
-      ui.alert("No authenticated characters found. Go to Extensions -> GESI -> Authorize Character to fix.");
+      alertUser("No authenticated characters found. Go to Extensions -> GESI -> Authorize Character to fix.");
       return false;
     }
 
@@ -131,28 +144,21 @@ function onOpen() {
   function GetCharInfo() {
     //Gets info about the main character listed at Settings cell A2 and returns a dictionary of information.
 
-    // Get the stored ID of the spreadsheet
-    
-    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
-    // Get the spreadsheet by its ID
-    var ss = SpreadsheetApp.openById(spreadsheetId);
-    var settingsSheet = ss.getSheetByName("Settings");
     var mainchar = settingsSheet.getRange("A2").getValue();
-    Logger.log("Main Char Set from Settings sheet as " + mainchar);
+    console.log("Main Char Set from Settings sheet as " + mainchar);
 
     if (mainchar == "") {
       Logger.log("Main Char missing from settings sheet. Trying to set from ESI_List instead")
       var ESI_List = ss.getSheetByName("ESI_List");
-      var altMainChar =ESI_List.getRange("A2").getValue();
+      var altMainChar = ESI_List ? ESI_List.getRange("A2").getValue() : "";
       if (altMainChar != "") {
         mainchar = altMainChar
-      
-      ui.alert("Using alternate settings from ESI_list: " + mainchar + "Please set mainchar in Settings Sheet")
-      } else if (altMainChar == "") {
-          ui.alert("Missing main character information. Please go to Settings Sheet to set it.")
-          return
-        }
-      
+        alertUser("Using alternate settings from ESI_list: " + mainchar + ". Please set mainchar in Settings Sheet")
+      } else {
+        alertUser("Missing main character information. Please go to Settings Sheet to set it.")
+        return
+      }
+
     }
     try {
         var charinfo = GESI.getCharacterData(mainchar);
@@ -166,22 +172,14 @@ function onOpen() {
     
   // This function clears cell D1 on the "CleanData" sheet
   function clearCellS2() {
-    // Get the active spreadsheet
-    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    // Get the "FuelData" sheet from the active spreadsheet
-    var sheet = spreadsheet.getSheetByName("CleanData");
+    var sheet = ss.getSheetByName("CleanData");
     // Clear the content of cell D1
     sheet.getRange("D1").clearContent();
   }
   
   // This function gets the current UTC timestamp and outputs it to cell D1 on the "CleanData" sheet
   function getUtcTimestampToS2() {
-   // Get the stored ID of the spreadsheet
-   var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
-   // Get the spreadsheet by its ID
-   var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    // Get the "FuelData" sheet from the active spreadsheet
-    var sheet = spreadsheet.getSheetByName("CleanData");
+    var sheet = ss.getSheetByName("CleanData");
     // Get the current UTC timestamp
     var utcTimestamp = getUtcTimestamp();
     // Write the UTC timestamp to cell D1
@@ -197,7 +195,7 @@ function onOpen() {
     // Return the UTC date and time as a string in ISO format
     return utcDate.toISOString();
   }
-  
+
 // This function updates the structures's fuel.
 function updateFuelStatus() {
 
@@ -205,16 +203,11 @@ function updateFuelStatus() {
     clearCellS2()
     getUtcTimestampToS2()
 
-    // Get the stored ID of the spreadsheet
-    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
-    // Get the spreadsheet by its ID
-    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    var settingsSheet = spreadsheet.getSheetByName("Settings");
-    var fuelPullSheet = spreadsheet.getSheetByName("FuelPull");
+    var fuelPullSheet = ss.getSheetByName("FuelPull");
 
     // If the 'FuelPull' sheet does not exist, create it.
     if (!fuelPullSheet) {
-      fuelPullSheet = spreadsheet.insertSheet("FuelPull");
+      fuelPullSheet = ss.insertSheet("FuelPull");
     }
 
     // Clear the 'FuelPull' sheet.
@@ -230,6 +223,7 @@ function updateFuelStatus() {
     for (var i = 0; i < names.length; i++) {
       if (names[i][0] !== "") {
         // Call the 'corporations_corporation_structures' function with the current name.
+        console.log("pulling fuel status for " + names[i][0]);
         var result = GESI.corporations_corporation_structures("en", names[i][0]);
 
         // If the 'result' array is not empty, populate the 'FuelPull' sheet with the data.
@@ -240,11 +234,12 @@ function updateFuelStatus() {
         }
 
         // Wait for 5 seconds before moving to the next name.
+        console.log("sleeping 5 seconds then moving to next")
         Utilities.sleep(5000);
       }
     }
+    console.log("fuel pull complete");
 }
-
 
   function sortFunction(a, b) {
       if (a[0] === b[0]) {
@@ -269,20 +264,15 @@ function updateFuelStatus() {
     //clear and reset the timestamp
     getUtcTimestampToS2()
     
-    // Get the stored ID of the spreadsheet
-    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
-    // Get the spreadsheet by its ID
-    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      
     // Get the Discord webhook URL from cell G2 of the "Settings" sheet
-    var discordWebhookUrl = spreadsheet.getSheetByName("Settings").getRange("G2").getValue();
+    var discordWebhookUrl = settingsSheet.getRange("G2").getValue();
     
-    if (!verify_pulldata(spreadsheet)) {
+    if (!verify_pulldata(ss)) {
       updateFuelStatus()
     }
     
     // Get the sheet named "CleanData" from the active spreadsheet
-    var sheet = spreadsheet.getSheetByName("CleanData");
+    var sheet = ss.getSheetByName("CleanData");
 
     // Get all the data from the "CleanData" sheet
     var data = sheet.getDataRange().getValues();
@@ -290,7 +280,6 @@ function updateFuelStatus() {
     Logger.log(data)  
 
     // set name and logo for the Discord Bot. Either corp name/logo (default) or custon name/logo (optional)
-    var settingsSheet = spreadsheet.getSheetByName("Settings");
     var customName = settingsSheet.getRange('G5').getValue();
     var customURL = settingsSheet.getRange('G8').getValue();
 
@@ -623,21 +612,15 @@ function updateFuelStatus() {
     // Update timestamp
     getUtcTimestampToS2();
 
-    // Get the stored ID of the spreadsheet
-    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
-    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-
-    var settingsSheet = spreadsheet.getSheetByName("Settings");
-
     // Get the Discord webhook URL from cell G2 of the "Settings" sheet
     var discordWebhookUrl = settingsSheet.getRange("G2").getValue();
 
-    if (!verify_pulldata(spreadsheet)) {
+    if (!verify_pulldata(ss)) {
       updateFuelStatus();
     }
 
     // Get data from CleanData sheet
-    var sheet = spreadsheet.getSheetByName("CleanData");
+    var sheet = ss.getSheetByName("CleanData");
     var data = sheet.getDataRange().getValues();
 
     // Get bot name and logo settings
@@ -1077,9 +1060,6 @@ function updateFuelStatus() {
    * Callable from the Fuel Bot menu for debugging.
    */
   function updateStarbaseFuelStatus() {
-    var spreadsheetId = PropertiesService.getScriptProperties().getProperty('spreadsheetId');
-    var spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    var settingsSheet = spreadsheet.getSheetByName("Settings");
     var characterName = settingsSheet.getRange("A2").getValue();
 
     if (!characterName) {
@@ -1104,12 +1084,6 @@ function updateFuelStatus() {
 
   // This function sets up the sheets for a new user
   function setupSheetsForNewUser() {
-    // Get the active Google Sheets document
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-    // Store the ID of the active spreadsheet
-    PropertiesService.getScriptProperties().setProperty('spreadsheetId', ss.getId());
-  
     // Check if the "FuelPull" sheet exists, if not, create it
     var fuelPullSheet = ss.getSheetByName("FuelPull");
     if (!fuelPullSheet) {
@@ -1173,32 +1147,31 @@ function updateFuelStatus() {
    
    }
 
-
-
     // Check if the "Settings" sheet exists, if not, create it
-    var settingsSheet = ss.getSheetByName("Settings");
-    if (!settingsSheet) {
-      settingsSheet = ss.insertSheet("Settings");
+    // The global settingsSheet is a const and is null on a fresh spreadsheet, so use a local here.
+    var setupSettingsSheet = settingsSheet;
+    if (!setupSettingsSheet) {
+      setupSettingsSheet = ss.insertSheet("Settings");
       // Set headers for the "Settings" sheet
-      settingsSheet.getRange("A1").setValue("Name(s)");
-      settingsSheet.getRange("G1").setValue("discordWebHook");
-      settingsSheet.getRange("F2").setValue("Fuel Webhook");
-      settingsSheet.getRange("F3").setValue("Moon Webhook")
-      settingsSheet.getRange("G4").setValue("Custom Bot Name (optional)");
-      settingsSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
-      settingsSheet.getRange("G7").setValue("Logo URL (optional)");
-      settingsSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
-      settingsSheet.getRange("G12").setValue("Fuel Role pings (optional)");
-      settingsSheet.getRange("H13").setValue("<-- Warning");
-      settingsSheet.getRange("H14").setValue("<-- Critical");
-      settingsSheet.getRange("F10").setValue("Enable Chunking");
-      settingsSheet.getRange("H10").setValue("<-- Set to 'Yes' to split large reports into multiple messages (for 50+ structures)")
-      settingsSheet.getRange("F11").setValue("Enable POS Reports");
-      settingsSheet.getRange("G11").setValue("No");
-      settingsSheet.getRange("H11").setValue("<-- Set to 'Yes' to include starbase (POS) fuel in scheduled reports (requires Director role + esi-corporations.read_starbases.v1)")
+      setupSettingsSheet.getRange("A1").setValue("Name(s)");
+      setupSettingsSheet.getRange("G1").setValue("discordWebHook");
+      setupSettingsSheet.getRange("F2").setValue("Fuel Webhook");
+      setupSettingsSheet.getRange("F3").setValue("Moon Webhook")
+      setupSettingsSheet.getRange("G4").setValue("Custom Bot Name (optional)");
+      setupSettingsSheet.getRange("H5").setValue('<-- Give your bot a custom name here or leave blank to use "<Corp Name> Fuel Bot"');
+      setupSettingsSheet.getRange("G7").setValue("Logo URL (optional)");
+      setupSettingsSheet.getRange("H8").setValue("<-- Enter a URL for a logo to use with your Fuel Bot. Default is Corp Logo for character in A2")
+      setupSettingsSheet.getRange("G12").setValue("Fuel Role pings (optional)");
+      setupSettingsSheet.getRange("H13").setValue("<-- Warning");
+      setupSettingsSheet.getRange("H14").setValue("<-- Critical");
+      setupSettingsSheet.getRange("F10").setValue("Enable Chunking");
+      setupSettingsSheet.getRange("H10").setValue("<-- Set to 'Yes' to split large reports into multiple messages (for 50+ structures)")
+      setupSettingsSheet.getRange("F11").setValue("Enable POS Reports");
+      setupSettingsSheet.getRange("G11").setValue("No");
+      setupSettingsSheet.getRange("H11").setValue("<-- Set to 'Yes' to include starbase (POS) fuel in scheduled reports (requires Director role + esi-corporations.read_starbases.v1)")
 
       // Define a range of cells where values should be entered so we can format them differently
-      var valueCells = settingsSheet.getRangeList(['A2','G2','G3','G5','G8','G10','G11','G13','G14'])
+      var valueCells = setupSettingsSheet.getRangeList(['A2','G2','G3','G5','G8','G10','G11','G13','G14'])
       valueCells.setBackground('yellow')
     }
     //setup moon sheets (code is in moon_tracker.gs)
@@ -1219,5 +1192,5 @@ function updateFuelStatus() {
    ui.alert(status_msg);
 
     // 👉 Jump user to Settings sheet
-    ss.setActiveSheet(settingsSheet); 
+    ss.setActiveSheet(setupSettingsSheet); 
  }

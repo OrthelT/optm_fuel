@@ -256,8 +256,7 @@ function reportHourlyMoonStatusToDiscord() {
   };
   data = moonPullSheet.getDataRange().getValues();
   if (data.length <= 1) {
-    ui = SpreadsheetApp.getUi()
-    ui.alert("No moon data found")
+    alertUser("No moon data found")
     return;
   }
   var webhookUrl = settingsSheet.getRange("G3").getValue();
@@ -523,8 +522,7 @@ function reportDailyMoonSummaryChunked() {
 
   var data = moonPullSheet.getDataRange().getValues();
   if (data.length <= 1) {
-    var ui = SpreadsheetApp.getUi();
-    ui.alert("No moon data found");
+    alertUser("No moon data found");
     return;
   }
 

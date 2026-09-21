@@ -6,3 +6,4 @@ fuel-tracker.bak
 node_modules/
 .env
 proxy-worker/optm_worker.js
+*bak2

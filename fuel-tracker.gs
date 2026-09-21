@@ -1,16 +1,15 @@
 /*
- * This script is designed to automate the process of tracking fuel status for EVE Online structures.
- * It pulls data from the game using GESI as a dependency in Google sheets to access EVE Online's API, 
- * processes the data, and reports the status to a Discord server via a web hook.
- * 
- * The script consists of several functions:
- * - setupSheetsForNewUser: Sets up the necessary sheets for a new user and provides instructions for setting up time-based triggers.
- * - updateStationFuel: Pulls new fuel data from the game and updates the 'Pull' sheet.
- * - getUtcTimestampToS2: Gets the current UTC timestamp and outputs it to cell D1 on the 'CleanData' sheet.
- * - reportStatusToDiscord: Reports the status to a Discord server.
- * - clearCellS2: Clears cell D1 on the 'CleanData' sheet.
- * 
- * The script uses time-based triggers to run these functions at specified intervals.
+  This script is designed to automate the process of tracking fuel status for EVE Online structures.
+  It pulls data from the game using GESI as a dependency in Google sheets to access EVE Online's API, 
+  processes the data, and reports the status to a Discord server via a web hook.
+ 
+ The script consists of several functions:
+ - setupSheetsForNewUser: Sets up the necessary sheets for a new user and provides instructions for setting up time-based triggers.
+ - updateStationFuel: Pulls new fuel data from the game and updates the 'Pull' sheet.
+ - getUtcTimestampToS2: Gets the current UTC timestamp and outputs it to cell D1 on the 'CleanData' sheet.
+ - reportStatusToDiscord: Reports the status to a Discord server.
+ - clearCellS2: Clears cell D1 on the 'CleanData' sheet.
+  The script uses time-based triggers to run these functions at specified intervals.
  */
 // Shared across all .gs files in the project. Top-level code runs before every
 // execution (triggers, menu items, onOpen), so keep it free of side effects.
